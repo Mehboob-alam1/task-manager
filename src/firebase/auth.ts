@@ -6,7 +6,7 @@ import {
   User as FirebaseUser,
 } from 'firebase/auth';
 import { auth } from './config';
-import { getUser, createUser, updateUser } from './firestore';
+import { getUser, createUser } from './firestore';
 import { User, UserRole } from '../types';
 
 // Check if Firebase is properly initialized

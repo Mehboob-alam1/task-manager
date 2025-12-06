@@ -2,14 +2,13 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { User, UserRole } from '../types';
 import { getUsers, updateUser } from '../firebase/firestore';
-import { UserPlus, Edit, Shield, User as UserIcon } from 'lucide-react';
+import { UserPlus, Shield, User as UserIcon } from 'lucide-react';
 
 export const UserManagement: React.FC = () => {
   const { user: currentUser } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
-  const [editingUser, setEditingUser] = useState<User | null>(null);
 
   const [formData, setFormData] = useState({
     email: '',

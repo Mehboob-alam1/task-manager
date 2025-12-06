@@ -10,7 +10,6 @@ export const DailyReports: React.FC = () => {
   const [reports, setReports] = useState<DailyReport[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedDate, setSelectedDate] = useState(new Date());
 
   useEffect(() => {
     if (user?.role !== 'admin') return;
