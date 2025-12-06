@@ -5,18 +5,21 @@ import { getMessaging, getToken, onMessage } from 'firebase/messaging';
 import { getFunctions } from 'firebase/functions';
 
 // Firebase configuration
+// Uses environment variables in production, falls back to hardcoded values for development
 const firebaseConfig = {
-  apiKey: "AIzaSyAWd1fGwdNlrvoUA3ELNKN5w0nEhoDUx3g",
-  authDomain: "task-manager-5e8f5.firebaseapp.com",
-  projectId: "task-manager-5e8f5",
-  storageBucket: "task-manager-5e8f5.firebasestorage.app",
-  messagingSenderId: "471275392592",
-  appId: "1:471275392592:web:51ea4a34dbfab980704b55",
-  measurementId: "G-5K55BFM0D0"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyAWd1fGwdNlrvoUA3ELNKN5w0nEhoDUx3g",
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "task-manager-5e8f5.firebaseapp.com",
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "task-manager-5e8f5",
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "task-manager-5e8f5.firebasestorage.app",
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "471275392592",
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:471275392592:web:51ea4a34dbfab980704b55",
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "G-5K55BFM0D0"
 };
 
 // Check if Firebase is configured (not using placeholder values)
-export const isFirebaseConfigured = firebaseConfig.apiKey !== "YOUR_API_KEY" && 
+export const isFirebaseConfigured = firebaseConfig.apiKey && 
+                                    firebaseConfig.apiKey !== "YOUR_API_KEY" && 
+                                    firebaseConfig.projectId && 
                                     firebaseConfig.projectId !== "YOUR_PROJECT_ID";
 
 // Initialize Firebase only if configured
@@ -62,7 +65,7 @@ export const requestNotificationPermission = async (): Promise<string | null> =>
     const permission = await Notification.requestPermission();
     if (permission === 'granted') {
       const token = await getToken(messaging, {
-        vapidKey: 'YOUR_VAPID_KEY' // TODO: Replace with your VAPID key
+        vapidKey: import.meta.env.VITE_FIREBASE_VAPID_KEY || 'YOUR_VAPID_KEY' // Set in Netlify environment variables
       });
       return token;
     }

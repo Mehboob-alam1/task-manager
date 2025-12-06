@@ -186,6 +186,49 @@ task_manager/
 - FCM requires HTTPS in production
 - Cloud Functions use Node.js 18 runtime
 
+## Deployment to Netlify
+
+### Quick Setup
+
+1. **Push to GitHub** (already done ✅)
+
+2. **Connect to Netlify**:
+   - Go to [Netlify](https://app.netlify.com)
+   - Click "Add new site" > "Import an existing project"
+   - Connect your GitHub repository
+   - Netlify will auto-detect settings from `netlify.toml`
+
+3. **Set Environment Variables** in Netlify Dashboard:
+   - Go to Site settings > Environment variables
+   - Add all `VITE_FIREBASE_*` variables (see `NETLIFY_DEPLOY.md`)
+
+4. **Deploy**:
+   - Netlify will automatically deploy on every push to main branch
+   - Or trigger a manual deploy from the dashboard
+
+### Build Settings (Auto-detected from netlify.toml)
+- Build command: `npm run build`
+- Publish directory: `dist`
+- Node version: `18`
+
+### Important Post-Deployment Steps
+
+1. **Add Netlify domain to Firebase**:
+   - Firebase Console > Authentication > Settings > Authorized domains
+   - Add your Netlify domain (e.g., `your-site.netlify.app`)
+
+2. **Deploy Firestore Rules**:
+   ```bash
+   firebase deploy --only firestore:rules
+   ```
+
+3. **Test the deployment**:
+   - Visit your Netlify URL
+   - Test login/signup
+   - Verify all features work
+
+For detailed deployment instructions, see `NETLIFY_DEPLOY.md`.
+
 ## License
 
 Private - Tax & Accounting Firm Internal Use
