@@ -36,9 +36,6 @@ export const StaffDashboard: React.FC = () => {
   const completedTasks = tasks.filter((t) => t.status === 'Completed');
   const pendingTasks = tasks.filter((t) => t.status === 'Pending');
   const inProgressTasks = tasks.filter((t) => t.status === 'In Progress');
-  const overdueTasks = tasks.filter(
-    (t) => t.status !== 'Completed' && new Date(t.deadline) < now
-  );
   const myOverdueTasks = myTasks.filter(
     (t) => t.status !== 'Completed' && new Date(t.deadline) < now
   );
