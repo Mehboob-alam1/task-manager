@@ -2,7 +2,7 @@ import React from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotifications } from '../contexts/NotificationContext';
-import { LogOut, Bell, Home, Calendar, BarChart3, PlusCircle, Users } from 'lucide-react';
+import { LogOut, Bell, Home, Calendar, BarChart3, PlusCircle, Users, FileText } from 'lucide-react';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -78,6 +78,17 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                     >
                       <Users className="w-4 h-4 mr-2" />
                       Users
+                    </Link>
+                    <Link
+                      to="/invoices"
+                      className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${
+                        isActive('/invoices')
+                          ? 'border-blue-500 text-gray-900'
+                          : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                      }`}
+                    >
+                      <FileText className="w-4 h-4 mr-2" />
+                      Invoices
                     </Link>
                   </>
                 )}

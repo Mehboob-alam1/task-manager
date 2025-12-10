@@ -12,6 +12,7 @@ import { CalendarView } from './components/CalendarView';
 import { DailyReports } from './components/DailyReports';
 import { Notifications } from './components/Notifications';
 import { UserManagement } from './components/UserManagement';
+import { Invoices } from './components/Invoices';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { SetupMessage } from './components/SetupMessage';
 import { isFirebaseConfigured } from './firebase/config';
@@ -217,6 +218,16 @@ function App() {
                     <AdminRoute>
                       <Layout>
                         <UserManagement />
+                      </Layout>
+                    </AdminRoute>
+                  }
+                />
+                <Route
+                  path="/invoices"
+                  element={
+                    <AdminRoute>
+                      <Layout>
+                        <Invoices />
                       </Layout>
                     </AdminRoute>
                   }
