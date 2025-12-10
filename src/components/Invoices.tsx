@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { Task, Invoice } from '../types';
-import { subscribeToTasks, createInvoice, subscribeToInvoices } from '../firebase/firestore';
+import { Task, Invoice, User } from '../types';
+import { subscribeToTasks, createInvoice, subscribeToInvoices, getUsers } from '../firebase/firestore';
 import { format, startOfWeek, endOfWeek, startOfDay, endOfDay } from 'date-fns';
 import { Download, PlusCircle, FileText } from 'lucide-react';
 
@@ -9,6 +9,7 @@ export const Invoices: React.FC = () => {
   const { user } = useAuth();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [invoiceType, setInvoiceType] = useState<'daily' | 'weekly'>('daily');
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -16,6 +17,7 @@ export const Invoices: React.FC = () => {
   const [generatedInvoice, setGeneratedInvoice] = useState<Invoice | null>(null);
   const [saving, setSaving] = useState(false);
   const [viewMode, setViewMode] = useState<'create' | 'list'>('create');
+  const [selectedStaffFilter, setSelectedStaffFilter] = useState<string>('all');
 
   useEffect(() => {
     if (!user) return;
@@ -27,9 +29,15 @@ export const Invoices: React.FC = () => {
       setLoading(false);
     });
 
+    // Load users for admin to show staff names
+    if (user.role === 'admin') {
+      getUsers().then(setUsers).catch(console.error);
+    }
+
     // Subscribe to invoices - staff can only see their own, admin sees all
     const unsubscribeInvoices = subscribeToInvoices((allInvoices) => {
-      console.log('Invoices updated:', allInvoices.length, 'invoices for user:', user.uid);
+      console.log('Invoices updated:', allInvoices.length, 'invoices for user:', user.uid, 'role:', user.role);
+      console.log('Invoice createdBy values:', allInvoices.map(inv => ({ id: inv.id, createdBy: inv.createdBy })));
       setInvoices(allInvoices);
     }, user.role === 'admin' ? undefined : user.uid);
 
@@ -47,6 +55,18 @@ export const Invoices: React.FC = () => {
       : tasks.filter(t => t.assignedEmployeeId === user?.uid);
     const clients = Array.from(new Set(relevantTasks.map((t) => t.clientName)));
     return clients.sort();
+  };
+
+  const getStaffName = (createdBy: string) => {
+    const staffMember = users.find(u => u.uid === createdBy);
+    return staffMember?.displayName || 'Unknown';
+  };
+
+  const getFilteredInvoices = () => {
+    if (user?.role !== 'admin' || selectedStaffFilter === 'all') {
+      return invoices;
+    }
+    return invoices.filter(inv => inv.createdBy === selectedStaffFilter);
   };
 
   const generateInvoice = () => {
@@ -422,25 +442,59 @@ Status: ${invoice.status.toUpperCase()}
       ) : (
         <div className="bg-white shadow rounded-lg overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-900">
-              {user?.role === 'admin' ? 'All Invoices' : 'My Invoices'}
-            </h2>
+            <div className="flex justify-between items-center">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">
+                  {user?.role === 'admin' ? 'All Invoices' : 'My Invoices'}
+                </h2>
+                {getFilteredInvoices().length > 0 && (
+                  <p className="text-sm text-gray-500 mt-1">
+                    {getFilteredInvoices().length} invoice{getFilteredInvoices().length !== 1 ? 's' : ''} found
+                  </p>
+                )}
+              </div>
+              {user?.role === 'admin' && users.length > 0 && (
+                <select
+                  value={selectedStaffFilter}
+                  onChange={(e) => setSelectedStaffFilter(e.target.value)}
+                  className="block border border-gray-300 rounded-md shadow-sm py-2 px-3 text-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="all">All Staff Members</option>
+                  {users.filter(u => u.role === 'staff').map((staff) => (
+                    <option key={staff.uid} value={staff.uid}>
+                      {staff.displayName}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
           </div>
-          {invoices.length === 0 ? (
+          {getFilteredInvoices().length === 0 ? (
             <div className="px-6 py-8 text-center text-gray-500">
-              No invoices found
+              <FileText className="w-12 h-12 mx-auto text-gray-400 mb-3" />
+              <p className="text-gray-500">No invoices found</p>
+              {user?.role === 'admin' && selectedStaffFilter !== 'all' && (
+                <p className="text-sm text-gray-400 mt-2">No invoices for selected staff member</p>
+              )}
             </div>
           ) : (
             <ul className="divide-y divide-gray-200">
-              {invoices.map((invoice) => (
+              {getFilteredInvoices().map((invoice) => (
                 <li key={invoice.id} className="px-6 py-4 hover:bg-gray-50">
                   <div className="flex items-center justify-between">
                     <div className="flex-1">
                       <div className="flex items-center space-x-3">
                         <div>
-                          <p className="text-sm font-medium text-gray-900">
-                            Invoice #{invoice.invoiceNumber}
-                          </p>
+                          <div className="flex items-center space-x-2">
+                            <p className="text-sm font-medium text-gray-900">
+                              Invoice #{invoice.invoiceNumber}
+                            </p>
+                            {user?.role === 'admin' && (
+                              <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                {getStaffName(invoice.createdBy)}
+                              </span>
+                            )}
+                          </div>
                           <p className="text-sm text-gray-500">
                             Client: {invoice.clientName} • {invoice.period === 'daily' ? 'Daily' : 'Weekly'} Invoice
                           </p>

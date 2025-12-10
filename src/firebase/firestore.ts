@@ -324,11 +324,22 @@ export const subscribeToInvoices = (
   let q;
   if (userId) {
     // Staff can only see their own invoices
-    q = query(
-      invoicesCollection,
-      where('createdBy', '==', userId),
-      orderBy('createdAt', 'desc')
-    );
+    // Note: This requires a composite index in Firestore for createdBy + createdAt
+    // Firestore will prompt to create it if missing
+    try {
+      q = query(
+        invoicesCollection,
+        where('createdBy', '==', userId),
+        orderBy('createdAt', 'desc')
+      );
+    } catch (error) {
+      console.error('Error creating query with orderBy. Trying without orderBy:', error);
+      // Fallback: query without orderBy if index is missing
+      q = query(
+        invoicesCollection,
+        where('createdBy', '==', userId)
+      );
+    }
   } else {
     // Admin can see all invoices
     q = query(invoicesCollection, orderBy('createdAt', 'desc'));
