@@ -13,6 +13,9 @@ export const AdminDashboard: React.FC = () => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
+  const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [filterClient, setFilterClient] = useState<string>('all');
+  const [filterEmployee, setFilterEmployee] = useState<string>('all');
 
   useEffect(() => {
     if (!user || user.role !== 'admin') {
@@ -50,6 +53,36 @@ export const AdminDashboard: React.FC = () => {
   const overdueTasks = tasks.filter(
     (t) => t.status !== 'Completed' && new Date(t.deadline) < now
   );
+
+  // Filter tasks based on selected filters
+  const filteredTasks = tasks.filter((task) => {
+    // Status filter
+    if (filterStatus !== 'all') {
+      if (filterStatus === 'overdue') {
+        if (task.status === 'Completed' || new Date(task.deadline) >= now) {
+          return false;
+        }
+      } else if (task.status !== filterStatus) {
+        return false;
+      }
+    }
+
+    // Client filter
+    if (filterClient !== 'all' && task.clientName !== filterClient) {
+      return false;
+    }
+
+    // Employee filter
+    if (filterEmployee !== 'all' && task.assignedEmployeeId !== filterEmployee) {
+      return false;
+    }
+
+    return true;
+  });
+
+  // Get unique clients and employees for dropdowns
+  const clients = Array.from(new Set(tasks.map((t) => t.clientName))).sort();
+  const employees = users.filter((u) => u.role === 'staff');
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
@@ -201,15 +234,60 @@ export const AdminDashboard: React.FC = () => {
       {/* All Tasks List */}
       <div className="bg-white shadow overflow-hidden sm:rounded-md mb-8">
         <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">All Tasks</h2>
+          <div className="flex justify-between items-center">
+            <h2 className="text-lg font-semibold text-gray-900">All Tasks</h2>
+            <div className="flex space-x-3">
+              {/* Status Filter Dropdown */}
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                className="block border border-gray-300 rounded-md shadow-sm py-2 px-3 text-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="all">All Status</option>
+                <option value="Pending">Pending</option>
+                <option value="In Progress">In Progress</option>
+                <option value="Completed">Completed</option>
+                <option value="On Hold">On Hold</option>
+                <option value="overdue">Overdue</option>
+              </select>
+
+              {/* Client Filter Dropdown */}
+              <select
+                value={filterClient}
+                onChange={(e) => setFilterClient(e.target.value)}
+                className="block border border-gray-300 rounded-md shadow-sm py-2 px-3 text-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="all">All Clients</option>
+                {clients.map((client) => (
+                  <option key={client} value={client}>
+                    {client}
+                  </option>
+                ))}
+              </select>
+
+              {/* Employee Filter Dropdown */}
+              <select
+                value={filterEmployee}
+                onChange={(e) => setFilterEmployee(e.target.value)}
+                className="block border border-gray-300 rounded-md shadow-sm py-2 px-3 text-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="all">All Employees</option>
+                {employees.map((employee) => (
+                  <option key={employee.uid} value={employee.uid}>
+                    {employee.displayName}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
         </div>
         <ul className="divide-y divide-gray-200">
-          {tasks.length === 0 ? (
+          {filteredTasks.length === 0 ? (
             <li className="px-6 py-8 text-center text-gray-500">
               No tasks found
             </li>
           ) : (
-            tasks.map((task) => (
+            filteredTasks.map((task) => (
               <li
                 key={task.id}
                 className="px-6 py-4 hover:bg-gray-50 cursor-pointer"
