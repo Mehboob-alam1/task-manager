@@ -63,9 +63,28 @@ service cloud.firestore {
            .hasOnly(['status', 'progressNotes', 'updatedAt']))
       );
       
-      // Only admins can delete tasks
-      allow delete: if isAdmin();
-    }
+    // Only admins can delete tasks
+    allow delete: if isAdmin();
+}
+
+// Invoices collection
+match /invoices/{invoiceId} {
+  // Admins can read all invoices, staff can only read their own
+  allow read: if isAuthenticated() && (
+    isAdmin() || 
+    resource.data.createdBy == request.auth.uid
+  );
+  
+  // Staff can create invoices for their assigned tasks, admins can create any
+  allow create: if isAuthenticated() && 
+    request.resource.data.createdBy == request.auth.uid;
+  
+  // Only admins can update invoices
+  allow update: if isAdmin();
+  
+  // Only admins can delete invoices
+  allow delete: if isAdmin();
+}
     
     // Notifications collection
     match /notifications/{notificationId} {
