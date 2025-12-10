@@ -267,14 +267,19 @@ export const invoicesCollection = collection(db, 'invoices');
 
 export const createInvoice = async (invoice: Omit<Invoice, 'id'>): Promise<string> => {
   if (!invoicesCollection) throw new Error('Firestore not initialized');
-  const docRef = await addDoc(invoicesCollection, {
+  console.log('Creating invoice with createdBy:', invoice.createdBy);
+  const invoiceData = {
     ...invoice,
     invoiceDate: Timestamp.fromDate(invoice.invoiceDate),
     dueDate: Timestamp.fromDate(invoice.dueDate),
     periodStart: Timestamp.fromDate(invoice.periodStart),
     periodEnd: Timestamp.fromDate(invoice.periodEnd),
     createdAt: Timestamp.fromDate(invoice.createdAt),
-  });
+    createdBy: invoice.createdBy, // Ensure createdBy is set
+  };
+  console.log('Invoice data to save:', invoiceData);
+  const docRef = await addDoc(invoicesCollection, invoiceData);
+  console.log('Invoice created with ID:', docRef.id);
   return docRef.id;
 };
 

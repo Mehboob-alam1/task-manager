@@ -29,6 +29,7 @@ export const Invoices: React.FC = () => {
 
     // Subscribe to invoices - staff can only see their own, admin sees all
     const unsubscribeInvoices = subscribeToInvoices((allInvoices) => {
+      console.log('Invoices updated:', allInvoices.length, 'invoices for user:', user.uid);
       setInvoices(allInvoices);
     }, user.role === 'admin' ? undefined : user.uid);
 
