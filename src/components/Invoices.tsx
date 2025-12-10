@@ -20,18 +20,14 @@ export const Invoices: React.FC = () => {
   useEffect(() => {
     if (!user) return;
 
-    // Staff can only see their assigned tasks, Admin can see all tasks
-    const taskFilter = user.role === 'admin' ? undefined : user.uid;
+    // Both admin and staff can see all tasks (for invoice generation)
+    // Staff will only be able to generate invoices for their assigned tasks
     const unsubscribeTasks = subscribeToTasks((allTasks) => {
-      // Filter tasks for staff - only show their assigned tasks
-      const filteredTasks = user.role === 'admin' 
-        ? allTasks 
-        : allTasks.filter(t => t.assignedEmployeeId === user.uid);
-      setTasks(filteredTasks);
+      setTasks(allTasks);
       setLoading(false);
-    }, taskFilter);
+    });
 
-    // Subscribe to invoices
+    // Subscribe to invoices - staff can only see their own, admin sees all
     const unsubscribeInvoices = subscribeToInvoices((allInvoices) => {
       setInvoices(allInvoices);
     }, user.role === 'admin' ? undefined : user.uid);
@@ -43,7 +39,12 @@ export const Invoices: React.FC = () => {
   }, [user]);
 
   const getClients = () => {
-    const clients = Array.from(new Set(tasks.map((t) => t.clientName)));
+    // For staff, only show clients for tasks assigned to them
+    // For admin, show all clients
+    const relevantTasks = user?.role === 'admin' 
+      ? tasks 
+      : tasks.filter(t => t.assignedEmployeeId === user?.uid);
+    const clients = Array.from(new Set(relevantTasks.map((t) => t.clientName)));
     return clients.sort();
   };
 

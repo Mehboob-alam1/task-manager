@@ -98,13 +98,13 @@ export const AdminDashboard: React.FC = () => {
   };
 
   return (
-    <div className="px-4 py-6">
+    <div>
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">
           Admin Dashboard
         </h1>
-        <p className="mt-2 text-gray-600">
-          Welcome, {user?.displayName} - Manage all tasks and users
+        <p className="text-gray-600">
+          Welcome back, <span className="font-semibold text-gray-900">{user?.displayName}</span> - Manage all tasks and users
         </p>
       </div>
 
