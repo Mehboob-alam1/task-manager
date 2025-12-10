@@ -93,6 +93,17 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                   </>
                 )}
                 <Link
+                  to="/invoices"
+                  className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${
+                    isActive('/invoices')
+                      ? 'border-blue-500 text-gray-900'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
+                >
+                  <FileText className="w-4 h-4 mr-2" />
+                  Invoices
+                </Link>
+                <Link
                   to="/calendar"
                   className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${
                     isActive('/calendar')

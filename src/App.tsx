@@ -225,11 +225,11 @@ function App() {
                 <Route
                   path="/invoices"
                   element={
-                    <AdminRoute>
+                    <PrivateRoute>
                       <Layout>
                         <Invoices />
                       </Layout>
-                    </AdminRoute>
+                    </PrivateRoute>
                   }
                 />
               </Routes>

@@ -16,7 +16,7 @@ import {
   DocumentData,
 } from 'firebase/firestore';
 import { db } from './config';
-import { Task, User, Notification, DailyReport } from '../types';
+import { Task, User, Notification, DailyReport, Invoice } from '../types';
 
 // Check if Firestore is configured
 if (!db) {
@@ -259,6 +259,90 @@ export const getDailyReports = async (): Promise<DailyReport[]> => {
       date: data.date?.toDate() || new Date(),
       generatedAt: data.generatedAt?.toDate() || new Date(),
     } as DailyReport;
+  });
+};
+
+// Invoices collection
+export const invoicesCollection = collection(db, 'invoices');
+
+export const createInvoice = async (invoice: Omit<Invoice, 'id'>): Promise<string> => {
+  if (!invoicesCollection) throw new Error('Firestore not initialized');
+  const docRef = await addDoc(invoicesCollection, {
+    ...invoice,
+    invoiceDate: Timestamp.fromDate(invoice.invoiceDate),
+    dueDate: Timestamp.fromDate(invoice.dueDate),
+    periodStart: Timestamp.fromDate(invoice.periodStart),
+    periodEnd: Timestamp.fromDate(invoice.periodEnd),
+    createdAt: Timestamp.fromDate(invoice.createdAt),
+  });
+  return docRef.id;
+};
+
+export const getInvoices = async (userId?: string): Promise<Invoice[]> => {
+  if (!invoicesCollection) throw new Error('Firestore not initialized');
+  let q;
+  if (userId) {
+    // Staff can only see their own invoices
+    q = query(
+      invoicesCollection,
+      where('createdBy', '==', userId),
+      orderBy('createdAt', 'desc')
+    );
+  } else {
+    // Admin can see all invoices
+    q = query(invoicesCollection, orderBy('createdAt', 'desc'));
+  }
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map((doc) => {
+    const data = doc.data();
+    return {
+      id: doc.id,
+      ...data,
+      invoiceDate: data.invoiceDate?.toDate() || new Date(),
+      dueDate: data.dueDate?.toDate() || new Date(),
+      periodStart: data.periodStart?.toDate() || new Date(),
+      periodEnd: data.periodEnd?.toDate() || new Date(),
+      createdAt: data.createdAt?.toDate() || new Date(),
+    } as Invoice;
+  });
+};
+
+export const subscribeToInvoices = (
+  callback: (invoices: Invoice[]) => void,
+  userId?: string
+): (() => void) => {
+  if (!invoicesCollection) {
+    console.error('Invoices collection not initialized');
+    return () => {};
+  }
+
+  let q;
+  if (userId) {
+    // Staff can only see their own invoices
+    q = query(
+      invoicesCollection,
+      where('createdBy', '==', userId),
+      orderBy('createdAt', 'desc')
+    );
+  } else {
+    // Admin can see all invoices
+    q = query(invoicesCollection, orderBy('createdAt', 'desc'));
+  }
+
+  return onSnapshot(q, (snapshot: QuerySnapshot<DocumentData>) => {
+    const invoices = snapshot.docs.map((doc) => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        ...data,
+        invoiceDate: data.invoiceDate?.toDate() || new Date(),
+        dueDate: data.dueDate?.toDate() || new Date(),
+        periodStart: data.periodStart?.toDate() || new Date(),
+        periodEnd: data.periodEnd?.toDate() || new Date(),
+        createdAt: data.createdAt?.toDate() || new Date(),
+      } as Invoice;
+    });
+    callback(invoices);
   });
 };
 
