@@ -124,9 +124,16 @@ export const Invoices: React.FC = () => {
     setSaving(true);
     try {
       await createInvoice(generatedInvoice);
-      alert('Invoice saved successfully!');
+      // Clear the generated invoice and switch to list view
+      // The invoice will appear in the list automatically via the real-time subscription
       setGeneratedInvoice(null);
+      setSelectedClient('');
       setViewMode('list');
+      // Small delay to ensure the subscription has updated
+      setTimeout(() => {
+        // Scroll to top of list to see the new invoice
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }, 100);
     } catch (error: any) {
       alert('Failed to save invoice: ' + error.message);
     } finally {
