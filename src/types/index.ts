@@ -11,6 +11,29 @@ export interface User {
 export type TaskPriority = 'Low' | 'Medium' | 'High';
 export type TaskStatus = 'Pending' | 'In Progress' | 'On Hold' | 'Completed';
 
+export const taskTypeCategories = {
+  'Tax Services': [
+    'Personal Tax Preparation',
+    'Corporate Tax Preparation',
+    'Tax Problem Resolution/Offer & Compromise',
+    'Penalty Abatement',
+    'Federal/State Representation'
+  ],
+  'Accounting Services': [
+    'Marked Financial Statements',
+    'Quickbooks Financial Statements',
+    'Payroll',
+    'Sales Tax',
+    'Initial QB Setup: Chart of Accounts & GL',
+    'Audit Services'
+  ],
+  'Consulting Services': [
+    'Business Consulting',
+    'Financial Planning',
+    'Tax Strategy'
+  ]
+} as const;
+
 export interface Task {
   id: string;
   clientName: string;
@@ -24,6 +47,8 @@ export interface Task {
   netInvoiceAmount: number;
   status: TaskStatus;
   progressNotes?: string;
+  taskType?: string; // Task type from categories
+  taskCategory?: string; // Category (Tax Services, Accounting Services, Consulting Services)
   createdAt: Date;
   updatedAt: Date;
   completedAt?: Date;
@@ -55,4 +80,31 @@ export interface Notification {
   taskId?: string;
   read: boolean;
   createdAt: Date;
+}
+
+export interface Invoice {
+  id: string;
+  invoiceNumber: string;
+  clientName: string;
+  invoiceDate: Date;
+  dueDate: Date;
+  period: 'daily' | 'weekly';
+  periodStart: Date;
+  periodEnd: Date;
+  tasks: {
+    taskId: string;
+    taskTitle: string;
+    taskType?: string;
+    taskCategory?: string;
+    hours: number;
+    rate: number;
+    amount: number;
+  }[];
+  subtotal: number;
+  tax: number;
+  total: number;
+  status: 'draft' | 'sent' | 'paid' | 'overdue';
+  notes?: string;
+  createdAt: Date;
+  createdBy: string; // Admin UID
 }

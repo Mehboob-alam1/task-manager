@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { Task, TaskPriority, User } from '../types';
+import { Task, TaskPriority, User, taskTypeCategories } from '../types';
 import { createTask, updateTask, getTask, getUsers } from '../firebase/firestore';
 import { createNotification } from '../firebase/firestore';
 import { format } from 'date-fns';
@@ -23,6 +23,8 @@ export const TaskForm: React.FC = () => {
     priority: 'Medium' as TaskPriority,
     estimatedDuration: '',
     netInvoiceAmount: '',
+    taskCategory: '',
+    taskType: '',
   });
 
   useEffect(() => {
