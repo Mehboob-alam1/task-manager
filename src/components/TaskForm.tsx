@@ -188,51 +188,58 @@ export const TaskForm: React.FC = () => {
           </select>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label htmlFor="taskCategory" className="block text-sm font-medium text-gray-700">
-              Task Category
-            </label>
-            <select
-              id="taskCategory"
-              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-              value={formData.taskCategory}
-              onChange={(e) => {
-                setFormData({ 
-                  ...formData, 
-                  taskCategory: e.target.value,
-                  taskType: '' // Reset task type when category changes
-                });
-              }}
-            >
-              <option value="">Select a category</option>
-              {Object.keys(taskTypeCategories).map((category) => (
-                <option key={category} value={category}>
-                  {category}
-                </option>
-              ))}
-            </select>
-          </div>
+        <div>
+          <label htmlFor="taskCategory" className="block text-sm font-medium text-gray-700 mb-2">
+            Task Category *
+          </label>
+          <select
+            id="taskCategory"
+            required
+            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+            value={formData.taskCategory}
+            onChange={(e) => {
+              setFormData({ 
+                ...formData, 
+                taskCategory: e.target.value,
+                taskType: '' // Reset task type when category changes
+              });
+            }}
+          >
+            <option value="">Select a category</option>
+            {Object.keys(taskTypeCategories).map((category) => (
+              <option key={category} value={category}>
+                {category}
+              </option>
+            ))}
+          </select>
+        </div>
 
-          <div>
-            <label htmlFor="taskType" className="block text-sm font-medium text-gray-700">
-              Task Type
-            </label>
-            <select
-              id="taskType"
-              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-              value={formData.taskType}
-              onChange={(e) => setFormData({ ...formData, taskType: e.target.value })}
-              disabled={!formData.taskCategory}
-            >
-              <option value="">Select a type</option>
-              {formData.taskCategory && taskTypeCategories[formData.taskCategory as keyof typeof taskTypeCategories]?.map((type) => (
-                <option key={type} value={type}>
-                  {type}
-                </option>
-              ))}
-            </select>
-          </div>
+        <div>
+          <label htmlFor="taskType" className="block text-sm font-medium text-gray-700 mb-2">
+            Task Type *
+          </label>
+          <select
+            id="taskType"
+            required
+            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+            value={formData.taskType}
+            onChange={(e) => setFormData({ ...formData, taskType: e.target.value })}
+            disabled={!formData.taskCategory}
+          >
+            <option value="">
+              {formData.taskCategory ? 'Select a task type' : 'First select a category'}
+            </option>
+            {formData.taskCategory && taskTypeCategories[formData.taskCategory as keyof typeof taskTypeCategories]?.map((type) => (
+              <option key={type} value={type}>
+                {type}
+              </option>
+            ))}
+          </select>
+          {formData.taskCategory && !formData.taskType && (
+            <p className="mt-1 text-sm text-gray-500">
+              Available types: {taskTypeCategories[formData.taskCategory as keyof typeof taskTypeCategories]?.join(', ')}
+            </p>
+          )}
         </div>
 
         <div className="grid grid-cols-2 gap-4">
