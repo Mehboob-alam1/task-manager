@@ -50,9 +50,14 @@ service cloud.firestore {
       // Admins and staff can read all tasks (staff can view all, but only update their assigned)
       allow read: if isAuthenticated();
       
-      // Only admins can create tasks
-      allow create: if isAdmin() && 
-        request.resource.data.createdBy == request.auth.uid;
+      // Admins can create tasks for anyone, staff can create tasks for themselves
+      allow create: if isAuthenticated() &&
+        request.resource.data.createdBy == request.auth.uid &&
+        (
+          isAdmin() ||
+          // Staff can create tasks, but only assign to themselves
+          (request.resource.data.assignedEmployeeId == request.auth.uid)
+        );
       
       // Admins can update any task, staff can only update their assigned tasks
       allow update: if isAuthenticated() && (

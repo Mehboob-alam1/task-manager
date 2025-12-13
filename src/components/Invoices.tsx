@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Task, Invoice, User } from '../types';
-import { subscribeToTasks, createInvoice, subscribeToInvoices, getUsers } from '../firebase/firestore';
+import { subscribeToTasks, createInvoice, subscribeToInvoices, getUsers, updateInvoice } from '../firebase/firestore';
 import { format, startOfWeek, endOfWeek, startOfDay, endOfDay } from 'date-fns';
-import { Download, PlusCircle, FileText } from 'lucide-react';
+import { Download, PlusCircle, FileText, FileDown } from 'lucide-react';
+import jsPDF from 'jspdf';
+import * as XLSX from 'xlsx';
 
 export const Invoices: React.FC = () => {
   const { user } = useAuth();
@@ -15,9 +17,11 @@ export const Invoices: React.FC = () => {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [selectedClient, setSelectedClient] = useState('');
   const [generatedInvoice, setGeneratedInvoice] = useState<Invoice | null>(null);
+  const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
   const [saving, setSaving] = useState(false);
   const [viewMode, setViewMode] = useState<'create' | 'list'>('create');
   const [selectedStaffFilter, setSelectedStaffFilter] = useState<string>('all');
+  const [selectedInvoices, setSelectedInvoices] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!user) return;
@@ -28,6 +32,13 @@ export const Invoices: React.FC = () => {
       setTasks(allTasks);
       setLoading(false);
     });
+    
+    // When editing invoice, populate form fields
+    if (editingInvoice) {
+      setSelectedClient(editingInvoice.clientName);
+      setInvoiceType(editingInvoice.period);
+      setSelectedDate(editingInvoice.invoiceDate);
+    }
 
     // Load users for admin to show staff names
     if (user.role === 'admin') {
@@ -67,6 +78,18 @@ export const Invoices: React.FC = () => {
       return invoices;
     }
     return invoices.filter(inv => inv.createdBy === selectedStaffFilter);
+  };
+
+  // Get invoices for current week
+  const getCurrentWeekInvoices = () => {
+    const now = new Date();
+    const weekStart = startOfWeek(now, { weekStartsOn: 0 });
+    const weekEnd = endOfWeek(now, { weekStartsOn: 0 });
+    
+    return getFilteredInvoices().filter((invoice) => {
+      const invoiceDate = new Date(invoice.invoiceDate);
+      return invoiceDate >= weekStart && invoiceDate <= weekEnd;
+    });
   };
 
   const generateInvoice = () => {
@@ -116,8 +139,8 @@ export const Invoices: React.FC = () => {
     });
 
     const subtotal = invoiceTasks.reduce((sum, item) => sum + item.amount, 0);
-    const tax = subtotal * 0.1; // 10% tax (adjust as needed)
-    const total = subtotal + tax;
+    const discount = 0; // Default discount, user can edit
+    const total = subtotal - discount;
 
     const invoice: Invoice = {
       id: `INV-${Date.now()}`,
@@ -130,7 +153,7 @@ export const Invoices: React.FC = () => {
       periodEnd,
       tasks: invoiceTasks,
       subtotal,
-      tax,
+      discount,
       total,
       status: 'draft',
       createdAt: new Date(),
@@ -142,17 +165,37 @@ export const Invoices: React.FC = () => {
 
   const saveInvoice = async () => {
     if (!generatedInvoice) return;
+    
     setSaving(true);
     try {
-      await createInvoice(generatedInvoice);
-      // Clear the generated invoice and switch to list view
-      // The invoice will appear in the list automatically via the real-time subscription
+      if (editingInvoice) {
+        // Update existing invoice with all editable fields
+        await updateInvoice(editingInvoice.id, {
+          clientName: generatedInvoice.clientName,
+          invoiceDate: generatedInvoice.invoiceDate,
+          dueDate: generatedInvoice.dueDate,
+          period: generatedInvoice.period,
+          periodStart: generatedInvoice.periodStart,
+          periodEnd: generatedInvoice.periodEnd,
+          tasks: generatedInvoice.tasks,
+          subtotal: generatedInvoice.subtotal,
+          discount: generatedInvoice.discount,
+          total: generatedInvoice.total,
+          status: generatedInvoice.status,
+          notes: generatedInvoice.notes,
+        });
+        setEditingInvoice(null);
+      } else {
+        // Create new invoice
+        await createInvoice(generatedInvoice);
+      }
+      // Clear and switch to list view
       setGeneratedInvoice(null);
+      setEditingInvoice(null);
       setSelectedClient('');
       setViewMode('list');
       // Small delay to ensure the subscription has updated
       setTimeout(() => {
-        // Scroll to top of list to see the new invoice
         window.scrollTo({ top: 0, behavior: 'smooth' });
       }, 100);
     } catch (error: any) {
@@ -162,42 +205,302 @@ export const Invoices: React.FC = () => {
     }
   };
 
-  const downloadInvoice = (invoice: Invoice) => {
-    const invoiceContent = `
-INVOICE
-Invoice Number: ${invoice.invoiceNumber}
-Client: ${invoice.clientName}
-Invoice Date: ${format(invoice.invoiceDate, 'MMMM dd, yyyy')}
-Due Date: ${format(invoice.dueDate, 'MMMM dd, yyyy')}
-Period: ${invoice.period === 'daily' ? 'Daily' : 'Weekly'} (${format(invoice.periodStart, 'MMM dd')} - ${format(invoice.periodEnd, 'MMM dd, yyyy')})
+  const downloadInvoicePDF = (invoice: Invoice) => {
+    const doc = new jsPDF();
+    let yPos = 20;
 
-TASKS:
-${invoice.tasks.map((task, index) => `
-${index + 1}. ${task.taskTitle}
-   ${task.taskCategory ? `Category: ${task.taskCategory}` : ''}
-   ${task.taskType ? `Type: ${task.taskType}` : ''}
-   Hours: ${task.hours}
-   Rate: $${task.rate.toFixed(2)}/hr
-   Amount: $${task.amount.toFixed(2)}
-`).join('')}
+    // Header
+    doc.setFontSize(20);
+    doc.text('INVOICE', 105, yPos, { align: 'center' });
+    yPos += 15;
 
-Subtotal: $${invoice.subtotal.toFixed(2)}
-Tax (10%): $${invoice.tax.toFixed(2)}
-TOTAL: $${invoice.total.toFixed(2)}
+    // Invoice Details
+    doc.setFontSize(12);
+    doc.text(`Invoice Number: ${invoice.invoiceNumber}`, 20, yPos);
+    yPos += 7;
+    doc.text(`Client: ${invoice.clientName}`, 20, yPos);
+    yPos += 7;
+    doc.text(`Invoice Date: ${format(invoice.invoiceDate, 'MMMM dd, yyyy')}`, 20, yPos);
+    yPos += 7;
+    doc.text(`Due Date: ${format(invoice.dueDate, 'MMMM dd, yyyy')}`, 20, yPos);
+    yPos += 7;
+    doc.text(`Period: ${invoice.period === 'daily' ? 'Daily' : 'Weekly'}`, 20, yPos);
+    yPos += 10;
 
-Status: ${invoice.status.toUpperCase()}
-    `.trim();
+    // Tasks Table Header
+    doc.setFontSize(10);
+    doc.text('Task', 20, yPos);
+    doc.text('Hours', 100, yPos);
+    doc.text('Rate', 130, yPos);
+    doc.text('Amount', 160, yPos);
+    yPos += 7;
+    doc.line(20, yPos, 190, yPos);
+    yPos += 5;
 
-    const blob = new Blob([invoiceContent], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${invoice.invoiceNumber}.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    // Tasks
+    invoice.tasks.forEach((task) => {
+      if (yPos > 250) {
+        doc.addPage();
+        yPos = 20;
+      }
+      doc.text(task.taskTitle.substring(0, 40), 20, yPos);
+      doc.text(task.hours.toString(), 100, yPos);
+      doc.text(`$${task.rate.toFixed(2)}`, 130, yPos);
+      doc.text(`$${task.amount.toFixed(2)}`, 160, yPos);
+      yPos += 7;
+    });
+
+    yPos += 5;
+    doc.line(20, yPos, 190, yPos);
+    yPos += 7;
+
+    // Totals
+    doc.setFontSize(11);
+    doc.text(`Subtotal: $${invoice.subtotal.toFixed(2)}`, 130, yPos, { align: 'right' });
+    yPos += 7;
+    doc.text(`Discount: $${invoice.discount.toFixed(2)}`, 130, yPos, { align: 'right' });
+    yPos += 7;
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`TOTAL: $${invoice.total.toFixed(2)}`, 130, yPos, { align: 'right' });
+    yPos += 10;
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Status: ${invoice.status.toUpperCase()}`, 20, yPos);
+
+    doc.save(`${invoice.invoiceNumber}.pdf`);
   };
+
+  const downloadInvoiceExcel = (invoice: Invoice) => {
+    const wsData = [
+      ['INVOICE'],
+      ['Invoice Number', invoice.invoiceNumber],
+      ['Client', invoice.clientName],
+      ['Invoice Date', format(invoice.invoiceDate, 'MMMM dd, yyyy')],
+      ['Due Date', format(invoice.dueDate, 'MMMM dd, yyyy')],
+      ['Period', invoice.period === 'daily' ? 'Daily' : 'Weekly'],
+      [],
+      ['TASKS'],
+      ['Task Title', 'Category', 'Type', 'Hours', 'Rate', 'Amount'],
+      ...invoice.tasks.map(task => [
+        task.taskTitle,
+        task.taskCategory || '',
+        task.taskType || '',
+        task.hours,
+        task.rate,
+        task.amount
+      ]),
+      [],
+      ['Subtotal', '', '', '', '', invoice.subtotal],
+      ['Discount', '', '', '', '', invoice.discount],
+      ['TOTAL', '', '', '', '', invoice.total],
+      ['Status', invoice.status.toUpperCase()]
+    ];
+
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Invoice');
+    XLSX.writeFile(wb, `${invoice.invoiceNumber}.xlsx`);
+  };
+
+  // Group invoices by week
+  const groupInvoicesByWeek = (invoices: Invoice[]): Map<string, Invoice[]> => {
+    const weekGroups = new Map<string, Invoice[]>();
+    
+    invoices.forEach((invoice) => {
+      const invoiceDate = new Date(invoice.invoiceDate);
+      const weekStart = startOfWeek(invoiceDate, { weekStartsOn: 0 });
+      const weekKey = format(weekStart, 'yyyy-MM-dd');
+      
+      if (!weekGroups.has(weekKey)) {
+        weekGroups.set(weekKey, []);
+      }
+      weekGroups.get(weekKey)!.push(invoice);
+    });
+    
+    return weekGroups;
+  };
+
+  const downloadWeeklyInvoicesPDF = (invoices: Invoice[]) => {
+    if (invoices.length === 0) {
+      alert('No invoices selected');
+      return;
+    }
+
+    const weekGroups = groupInvoicesByWeek(invoices);
+    const doc = new jsPDF();
+    
+    weekGroups.forEach((weekInvoices, weekKey) => {
+      const weekStart = new Date(weekKey);
+      const weekEnd = endOfWeek(weekStart, { weekStartsOn: 0 });
+      
+      let yPos = 20;
+      let isFirstPage = true;
+
+      // Week Header
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'bold');
+      doc.text(
+        `WEEKLY INVOICES: ${format(weekStart, 'MMM dd')} - ${format(weekEnd, 'MMM dd, yyyy')}`,
+        105,
+        yPos,
+        { align: 'center' }
+      );
+      yPos += 15;
+
+      weekInvoices.forEach((invoice, index) => {
+        // Check if we need a new page (leave space for at least one invoice)
+        if (yPos > 200 && !isFirstPage) {
+          doc.addPage();
+          yPos = 20;
+          // Re-add week header on new page
+          doc.setFontSize(18);
+          doc.setFont('helvetica', 'bold');
+          doc.text(
+            `WEEKLY INVOICES: ${format(weekStart, 'MMM dd')} - ${format(weekEnd, 'MMM dd, yyyy')}`,
+            105,
+            yPos,
+            { align: 'center' }
+          );
+          yPos += 15;
+        }
+        isFirstPage = false;
+
+        // Invoice separator
+        if (index > 0) {
+          doc.line(20, yPos, 190, yPos);
+          yPos += 10;
+        }
+
+        // Invoice Header
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`Invoice #${invoice.invoiceNumber}`, 20, yPos);
+        yPos += 8;
+
+        // Invoice Details
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`Client: ${invoice.clientName}`, 20, yPos);
+        doc.text(`Date: ${format(invoice.invoiceDate, 'MMM dd, yyyy')}`, 100, yPos);
+        yPos += 6;
+        doc.text(`Period: ${invoice.period === 'daily' ? 'Daily' : 'Weekly'}`, 20, yPos);
+        doc.text(`Status: ${invoice.status.toUpperCase()}`, 100, yPos);
+        yPos += 8;
+
+        // Tasks Table Header
+        doc.setFontSize(9);
+        doc.text('Task', 20, yPos);
+        doc.text('Hours', 100, yPos);
+        doc.text('Rate', 130, yPos);
+        doc.text('Amount', 160, yPos);
+        yPos += 5;
+        doc.line(20, yPos, 190, yPos);
+        yPos += 5;
+
+        // Tasks (compact)
+        invoice.tasks.forEach((task) => {
+          if (yPos > 270) {
+            doc.addPage();
+            yPos = 20;
+            // Re-add week header
+            doc.setFontSize(18);
+            doc.setFont('helvetica', 'bold');
+            doc.text(
+              `WEEKLY INVOICES: ${format(weekStart, 'MMM dd')} - ${format(weekEnd, 'MMM dd, yyyy')}`,
+              105,
+              yPos,
+              { align: 'center' }
+            );
+            yPos += 15;
+          }
+          doc.setFontSize(9);
+          doc.text(task.taskTitle.substring(0, 35), 20, yPos);
+          doc.text(task.hours.toString(), 100, yPos);
+          doc.text(`$${task.rate.toFixed(2)}`, 130, yPos);
+          doc.text(`$${task.amount.toFixed(2)}`, 160, yPos);
+          yPos += 5;
+        });
+
+        yPos += 3;
+        doc.line(20, yPos, 190, yPos);
+        yPos += 5;
+
+        // Invoice Totals
+        doc.setFontSize(10);
+        doc.text(`Subtotal: $${invoice.subtotal.toFixed(2)}`, 130, yPos, { align: 'right' });
+        yPos += 5;
+        doc.text(`Discount: $${invoice.discount.toFixed(2)}`, 130, yPos, { align: 'right' });
+        yPos += 5;
+        doc.setFont('helvetica', 'bold');
+        doc.text(`TOTAL: $${invoice.total.toFixed(2)}`, 130, yPos, { align: 'right' });
+        yPos += 8;
+        doc.setFont('helvetica', 'normal');
+      });
+
+      // Week Summary
+      const weekTotal = weekInvoices.reduce((sum, inv) => sum + inv.total, 0);
+      yPos += 5;
+      doc.line(20, yPos, 190, yPos);
+      yPos += 8;
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text(
+        `WEEK TOTAL: $${weekTotal.toFixed(2)}`,
+        130,
+        yPos,
+        { align: 'right' }
+      );
+      yPos += 15;
+    });
+
+    const fileName = `Weekly_Invoices_${format(new Date(), 'yyyyMMdd')}.pdf`;
+    doc.save(fileName);
+  };
+
+  const downloadMultipleInvoicesPDF = (invoices: Invoice[]) => {
+    // Use weekly grouping by default
+    downloadWeeklyInvoicesPDF(invoices);
+  };
+
+  const downloadMultipleInvoicesExcel = (invoices: Invoice[]) => {
+    const wsData: any[] = [];
+
+    invoices.forEach((invoice, index) => {
+      if (index > 0) {
+        wsData.push([]);
+      }
+      wsData.push(
+        ['INVOICE'],
+        ['Invoice Number', invoice.invoiceNumber],
+        ['Client', invoice.clientName],
+        ['Invoice Date', format(invoice.invoiceDate, 'MMMM dd, yyyy')],
+        ['Due Date', format(invoice.dueDate, 'MMMM dd, yyyy')],
+        ['Period', invoice.period === 'daily' ? 'Daily' : 'Weekly'],
+        [],
+        ['TASKS'],
+        ['Task Title', 'Category', 'Type', 'Hours', 'Rate', 'Amount'],
+        ...invoice.tasks.map(task => [
+          task.taskTitle,
+          task.taskCategory || '',
+          task.taskType || '',
+          task.hours,
+          task.rate,
+          task.amount
+        ]),
+        [],
+        ['Subtotal', '', '', '', '', invoice.subtotal],
+        ['Discount', '', '', '', '', invoice.discount],
+        ['TOTAL', '', '', '', '', invoice.total],
+        ['Status', invoice.status.toUpperCase()]
+      );
+    });
+
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Invoices');
+    XLSX.writeFile(wb, `Invoices_${format(new Date(), 'yyyyMMdd')}.xlsx`);
+  };
+
 
   if (loading) {
     return <div className="text-center py-12">Loading...</div>;
@@ -329,13 +632,33 @@ Status: ${invoice.status.toUpperCase()}
                   >
                     {saving ? 'Saving...' : 'Save Invoice'}
                   </button>
-                  <button
-                    onClick={() => downloadInvoice(generatedInvoice)}
-                    className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
-                  >
-                    <Download className="w-4 h-4 mr-2" />
-                    Download
-                  </button>
+                  {user?.role === 'admin' && (
+                    <>
+                      <button
+                        onClick={() => downloadInvoicePDF(generatedInvoice)}
+                        className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700"
+                      >
+                        <FileDown className="w-4 h-4 mr-2" />
+                        Download PDF
+                      </button>
+                      <button
+                        onClick={() => downloadInvoiceExcel(generatedInvoice)}
+                        className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700"
+                      >
+                        <FileDown className="w-4 h-4 mr-2" />
+                        Download Excel
+                      </button>
+                    </>
+                  )}
+                  {user?.role !== 'admin' && (
+                    <button
+                      onClick={() => downloadInvoicePDF(generatedInvoice)}
+                      className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
+                    >
+                      <Download className="w-4 h-4 mr-2" />
+                      Download PDF
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -388,20 +711,92 @@ Status: ${invoice.status.toUpperCase()}
                         {generatedInvoice.tasks.map((task, index) => (
                           <tr key={index}>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                              {task.taskTitle}
+                              <input
+                                type="text"
+                                value={task.taskTitle}
+                                onChange={(e) => {
+                                  const updatedTasks = [...generatedInvoice.tasks];
+                                  updatedTasks[index] = { ...task, taskTitle: e.target.value };
+                                  const newSubtotal = updatedTasks.reduce((sum, t) => sum + t.amount, 0);
+                                  setGeneratedInvoice({
+                                    ...generatedInvoice,
+                                    tasks: updatedTasks,
+                                    subtotal: newSubtotal,
+                                    total: newSubtotal - generatedInvoice.discount
+                                  });
+                                }}
+                                className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                              />
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                               {task.taskCategory && <div>{task.taskCategory}</div>}
                               {task.taskType && <div className="text-xs">{task.taskType}</div>}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                              {task.hours}
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.1"
+                                value={task.hours}
+                                onChange={(e) => {
+                                  const hours = parseFloat(e.target.value) || 0;
+                                  const amount = hours * task.rate;
+                                  const updatedTasks = [...generatedInvoice.tasks];
+                                  updatedTasks[index] = { ...task, hours, amount };
+                                  const newSubtotal = updatedTasks.reduce((sum, t) => sum + t.amount, 0);
+                                  setGeneratedInvoice({
+                                    ...generatedInvoice,
+                                    tasks: updatedTasks,
+                                    subtotal: newSubtotal,
+                                    total: newSubtotal - generatedInvoice.discount
+                                  });
+                                }}
+                                className="w-20 px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                              />
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                              ${task.rate.toFixed(2)}
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={task.rate.toFixed(2)}
+                                onChange={(e) => {
+                                  const rate = parseFloat(e.target.value) || 0;
+                                  const amount = task.hours * rate;
+                                  const updatedTasks = [...generatedInvoice.tasks];
+                                  updatedTasks[index] = { ...task, rate, amount };
+                                  const newSubtotal = updatedTasks.reduce((sum, t) => sum + t.amount, 0);
+                                  setGeneratedInvoice({
+                                    ...generatedInvoice,
+                                    tasks: updatedTasks,
+                                    subtotal: newSubtotal,
+                                    total: newSubtotal - generatedInvoice.discount
+                                  });
+                                }}
+                                className="w-24 px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                              />
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                              ${task.amount.toFixed(2)}
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={task.amount.toFixed(2)}
+                                onChange={(e) => {
+                                  const amount = parseFloat(e.target.value) || 0;
+                                  const rate = task.hours > 0 ? amount / task.hours : 0;
+                                  const updatedTasks = [...generatedInvoice.tasks];
+                                  updatedTasks[index] = { ...task, amount, rate };
+                                  const newSubtotal = updatedTasks.reduce((sum, t) => sum + t.amount, 0);
+                                  setGeneratedInvoice({
+                                    ...generatedInvoice,
+                                    tasks: updatedTasks,
+                                    subtotal: newSubtotal,
+                                    total: newSubtotal - generatedInvoice.discount
+                                  });
+                                }}
+                                className="w-24 px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                              />
                             </td>
                           </tr>
                         ))}
@@ -417,10 +812,25 @@ Status: ${invoice.status.toUpperCase()}
                         </tr>
                         <tr>
                           <td colSpan={4} className="px-6 py-4 text-right text-sm font-medium text-gray-900">
-                            Tax (10%):
+                            Discount:
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                            ${generatedInvoice.tax.toFixed(2)}
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={generatedInvoice.discount}
+                              onChange={(e) => {
+                                const discount = parseFloat(e.target.value) || 0;
+                                const newTotal = generatedInvoice.subtotal - discount;
+                                setGeneratedInvoice({
+                                  ...generatedInvoice,
+                                  discount,
+                                  total: newTotal,
+                                });
+                              }}
+                              className="w-24 px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                            />
                           </td>
                         </tr>
                         <tr>
@@ -448,25 +858,92 @@ Status: ${invoice.status.toUpperCase()}
                   {user?.role === 'admin' ? 'All Invoices' : 'My Invoices'}
                 </h2>
                 {getFilteredInvoices().length > 0 && (
-                  <p className="text-sm text-gray-500 mt-1">
-                    {getFilteredInvoices().length} invoice{getFilteredInvoices().length !== 1 ? 's' : ''} found
-                  </p>
+                  <div className="flex items-center space-x-4 mt-1">
+                    <p className="text-sm text-gray-500">
+                      {getFilteredInvoices().length} invoice{getFilteredInvoices().length !== 1 ? 's' : ''} found
+                      {user?.role === 'admin' && selectedInvoices.size > 0 && (
+                        <span className="ml-2 text-blue-600 font-medium">
+                          ({selectedInvoices.size} selected)
+                        </span>
+                      )}
+                    </p>
+                    {getCurrentWeekInvoices().length > 0 && (
+                      <button
+                        onClick={() => downloadWeeklyInvoicesPDF(getCurrentWeekInvoices())}
+                        className="inline-flex items-center px-3 py-1 border border-blue-300 rounded-md text-sm font-medium text-blue-700 bg-blue-50 hover:bg-blue-100"
+                        title="Download all invoices for current week"
+                      >
+                        <FileDown className="w-4 h-4 mr-1" />
+                        Download This Week ({getCurrentWeekInvoices().length})
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
-              {user?.role === 'admin' && users.length > 0 && (
-                <select
-                  value={selectedStaffFilter}
-                  onChange={(e) => setSelectedStaffFilter(e.target.value)}
-                  className="block border border-gray-300 rounded-md shadow-sm py-2 px-3 text-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="all">All Staff Members</option>
-                  {users.filter(u => u.role === 'staff').map((staff) => (
-                    <option key={staff.uid} value={staff.uid}>
-                      {staff.displayName}
-                    </option>
-                  ))}
-                </select>
-              )}
+              <div className="flex items-center space-x-3">
+                {user?.role === 'admin' && users.length > 0 && (
+                  <select
+                    value={selectedStaffFilter}
+                    onChange={(e) => {
+                      setSelectedStaffFilter(e.target.value);
+                      setSelectedInvoices(new Set());
+                    }}
+                    className="block border border-gray-300 rounded-md shadow-sm py-2 px-3 text-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="all">All Staff Members</option>
+                    {users.filter(u => u.role === 'staff').map((staff) => (
+                      <option key={staff.uid} value={staff.uid}>
+                        {staff.displayName}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                {user?.role === 'admin' && getFilteredInvoices().length > 0 && (
+                  <div className="flex space-x-2">
+                    {selectedInvoices.size > 0 && (
+                      <>
+                        <button
+                          onClick={() => {
+                            const selected = getFilteredInvoices().filter(inv => selectedInvoices.has(inv.id));
+                            downloadMultipleInvoicesPDF(selected);
+                          }}
+                          className="inline-flex items-center px-3 py-1 border border-red-300 rounded-md text-sm font-medium text-red-700 bg-red-50 hover:bg-red-100"
+                        >
+                          <FileDown className="w-4 h-4 mr-1" />
+                          Download {selectedInvoices.size} PDF
+                        </button>
+                        <button
+                          onClick={() => {
+                            const selected = getFilteredInvoices().filter(inv => selectedInvoices.has(inv.id));
+                            downloadMultipleInvoicesExcel(selected);
+                          }}
+                          className="inline-flex items-center px-3 py-1 border border-green-300 rounded-md text-sm font-medium text-green-700 bg-green-50 hover:bg-green-100"
+                        >
+                          <FileDown className="w-4 h-4 mr-1" />
+                          Download {selectedInvoices.size} Excel
+                        </button>
+                        <button
+                          onClick={() => setSelectedInvoices(new Set())}
+                          className="px-3 py-1 text-sm text-gray-600 hover:text-gray-800"
+                        >
+                          Clear
+                        </button>
+                      </>
+                    )}
+                    {selectedInvoices.size === 0 && (
+                      <button
+                        onClick={() => {
+                          const allIds = new Set(getFilteredInvoices().map(inv => inv.id));
+                          setSelectedInvoices(allIds);
+                        }}
+                        className="px-3 py-1 text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded"
+                      >
+                        Select All
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
           {getFilteredInvoices().length === 0 ? (
@@ -507,12 +984,44 @@ Status: ${invoice.status.toUpperCase()}
                     </div>
                     <div className="flex space-x-2">
                       <button
-                        onClick={() => downloadInvoice(invoice)}
-                        className="inline-flex items-center px-3 py-1 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                        onClick={() => {
+                          setEditingInvoice(invoice);
+                          setGeneratedInvoice(invoice);
+                          setViewMode('create');
+                        }}
+                        className="inline-flex items-center px-3 py-1 border border-blue-300 rounded-md text-sm font-medium text-blue-700 bg-blue-50 hover:bg-blue-100"
                       >
-                        <Download className="w-4 h-4 mr-1" />
-                        Download
+                        Edit
                       </button>
+                      {user?.role === 'admin' && (
+                        <>
+                          <button
+                            onClick={() => downloadInvoicePDF(invoice)}
+                            className="inline-flex items-center px-3 py-1 border border-red-300 rounded-md text-sm font-medium text-red-700 bg-red-50 hover:bg-red-100"
+                            title="Download PDF"
+                          >
+                            <FileDown className="w-4 h-4 mr-1" />
+                            PDF
+                          </button>
+                          <button
+                            onClick={() => downloadInvoiceExcel(invoice)}
+                            className="inline-flex items-center px-3 py-1 border border-green-300 rounded-md text-sm font-medium text-green-700 bg-green-50 hover:bg-green-100"
+                            title="Download Excel"
+                          >
+                            <FileDown className="w-4 h-4 mr-1" />
+                            Excel
+                          </button>
+                        </>
+                      )}
+                      {user?.role !== 'admin' && (
+                        <button
+                          onClick={() => downloadInvoicePDF(invoice)}
+                          className="inline-flex items-center px-3 py-1 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                        >
+                          <Download className="w-4 h-4 mr-1" />
+                          Download PDF
+                        </button>
+                      )}
                     </div>
                   </div>
                 </li>

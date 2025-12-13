@@ -306,11 +306,27 @@ export const AdminDashboard: React.FC = () => {
                       </div>
                     </div>
                     <div className="mt-2 flex items-center space-x-4 text-sm text-gray-500">
-                      <span>Deadline: {format(new Date(task.deadline), 'MMM dd, yyyy')}</span>
+                      <span>Deadline: {format(new Date(task.deadline), 'MMM dd, yyyy HH:mm')}</span>
                       <span className={`px-2 py-1 rounded-full text-xs font-medium ${getPriorityColor(task.priority)}`}>
                         {task.priority}
                       </span>
                       <span>Status: {task.status}</span>
+                      {task.createdAt && (
+                        <span className="text-blue-600">
+                          Time elapsed: {Math.floor((now.getTime() - new Date(task.createdAt).getTime()) / (1000 * 60 * 60))}h {Math.floor(((now.getTime() - new Date(task.createdAt).getTime()) % (1000 * 60 * 60)) / (1000 * 60))}m
+                        </span>
+                      )}
+                      {task.createdAt && (
+                        <span className="text-orange-600">
+                          Time remaining: {(() => {
+                            const remaining = new Date(task.deadline).getTime() - now.getTime();
+                            if (remaining <= 0) return 'Overdue';
+                            const hours = Math.floor(remaining / (1000 * 60 * 60));
+                            const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
+                            return `${hours}h ${minutes}m`;
+                          })()}
+                        </span>
+                      )}
                     </div>
                   </div>
                   {new Date(task.deadline) < now && task.status !== 'Completed' && (

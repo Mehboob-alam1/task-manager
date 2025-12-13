@@ -185,30 +185,51 @@ export const subscribeToTasks = (
   employeeId?: string
 ): (() => void) => {
   let q;
+  let needsClientSideSort = false;
+  
   if (employeeId) {
+    // Query without orderBy to avoid index requirement, we'll sort client-side
     q = query(
       tasksCollection,
-      where('assignedEmployeeId', '==', employeeId),
-      orderBy('deadline', 'asc')
+      where('assignedEmployeeId', '==', employeeId)
     );
+    needsClientSideSort = true;
   } else {
     q = query(tasksCollection, orderBy('createdAt', 'desc'));
   }
 
-  return onSnapshot(q, (snapshot: QuerySnapshot<DocumentData>) => {
-    const tasks = snapshot.docs.map((doc) => {
-      const data = doc.data();
-      return {
-        id: doc.id,
-        ...data,
-        deadline: data.deadline?.toDate() || new Date(),
-        createdAt: data.createdAt?.toDate() || new Date(),
-        updatedAt: data.updatedAt?.toDate() || new Date(),
-        completedAt: data.completedAt?.toDate(),
-      } as Task;
-    });
-    callback(tasks);
-  });
+  return onSnapshot(
+    q,
+    (snapshot: QuerySnapshot<DocumentData>) => {
+      const tasks = snapshot.docs.map((doc) => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          ...data,
+          deadline: data.deadline?.toDate() || new Date(),
+          createdAt: data.createdAt?.toDate() || new Date(),
+          updatedAt: data.updatedAt?.toDate() || new Date(),
+          completedAt: data.completedAt?.toDate(),
+        } as Task;
+      });
+      
+      // Sort by deadline client-side if needed
+      if (needsClientSideSort) {
+        tasks.sort((a, b) => a.deadline.getTime() - b.deadline.getTime());
+      }
+      
+      callback(tasks);
+    },
+    (error) => {
+      // Handle errors gracefully
+      console.error('Error in subscribeToTasks:', error);
+      if (error.code === 'failed-precondition') {
+        console.warn('Firestore index missing. Please create the index or the query will work without orderBy.');
+      }
+      // Return empty array on error to prevent app crash
+      callback([]);
+    }
+  );
 };
 
 // Notifications collection
@@ -281,6 +302,29 @@ export const createInvoice = async (invoice: Omit<Invoice, 'id'>): Promise<strin
   const docRef = await addDoc(invoicesCollection, invoiceData);
   console.log('Invoice created with ID:', docRef.id);
   return docRef.id;
+};
+
+export const getInvoice = async (invoiceId: string): Promise<Invoice | null> => {
+  if (!invoicesCollection) throw new Error('Firestore not initialized');
+  const docRef = doc(invoicesCollection, invoiceId);
+  const docSnap = await getDoc(docRef);
+  if (!docSnap.exists()) return null;
+  const data = docSnap.data();
+  return {
+    id: docSnap.id,
+    ...data,
+    invoiceDate: data.invoiceDate?.toDate() || new Date(),
+    dueDate: data.dueDate?.toDate() || new Date(),
+    periodStart: data.periodStart?.toDate() || new Date(),
+    periodEnd: data.periodEnd?.toDate() || new Date(),
+    createdAt: data.createdAt?.toDate() || new Date(),
+  } as Invoice;
+};
+
+export const updateInvoice = async (invoiceId: string, updates: Partial<Invoice>): Promise<void> => {
+  if (!invoicesCollection) throw new Error('Firestore not initialized');
+  const docRef = doc(invoicesCollection, invoiceId);
+  await updateDoc(docRef, updates);
 };
 
 export const getInvoices = async (userId?: string): Promise<Invoice[]> => {

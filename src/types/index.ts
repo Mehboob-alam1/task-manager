@@ -101,10 +101,12 @@ export interface Invoice {
     amount: number;
   }[];
   subtotal: number;
-  tax: number;
+  discount: number; // Discount amount (editable by user)
+  discountPercent?: number; // Optional discount percentage
   total: number;
   status: 'draft' | 'sent' | 'paid' | 'overdue';
   notes?: string;
   createdAt: Date;
   createdBy: string; // Admin UID
+  taskId?: string; // Link to the task that created this invoice
 }

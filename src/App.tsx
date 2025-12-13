@@ -155,11 +155,11 @@ function App() {
                 <Route
                   path="/tasks/create"
                   element={
-                    <AdminRoute>
+                    <PrivateRoute>
                       <Layout>
                         <TaskForm />
                       </Layout>
-                    </AdminRoute>
+                    </PrivateRoute>
                   }
                 />
                 <Route
