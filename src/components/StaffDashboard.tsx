@@ -57,10 +57,10 @@ export const StaffDashboard: React.FC = () => {
     <div>
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900">
-          Staff Dashboard
+          {user?.displayName || 'Staff'} Dashboard
         </h1>
         <p className="mt-2 text-gray-600">
-          Welcome, {user?.displayName} - View all tasks (you can update your assigned tasks)
+          Welcome - View all tasks (you can update your assigned tasks)
         </p>
       </div>
 
