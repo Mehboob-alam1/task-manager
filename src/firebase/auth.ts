@@ -3,6 +3,7 @@ import {
   createUserWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
+  sendPasswordResetEmail,
   User as FirebaseUser,
 } from 'firebase/auth';
 import { auth } from './config';
@@ -102,6 +103,25 @@ export const logout = async (): Promise<void> => {
     return;
   }
   await signOut(auth);
+};
+
+export const resetPassword = async (email: string): Promise<void> => {
+  if (!auth) {
+    throw new Error('Firebase Auth is not configured. Please update src/firebase/config.ts');
+  }
+  try {
+    await sendPasswordResetEmail(auth, email);
+  } catch (error: any) {
+    console.error('[resetPassword] Error sending password reset email:', error);
+    if (error.code === 'auth/user-not-found') {
+      throw new Error('No account found with this email address.');
+    } else if (error.code === 'auth/invalid-email') {
+      throw new Error('Invalid email address.');
+    } else if (error.code === 'auth/too-many-requests') {
+      throw new Error('Too many requests. Please try again later.');
+    }
+    throw new Error(error.message || 'Failed to send password reset email. Please try again.');
+  }
 };
 
 export const getCurrentUser = (): Promise<User | null> => {

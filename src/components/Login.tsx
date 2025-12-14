@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { LogIn, Mail, Lock, Building2 } from 'lucide-react';
+import { LogIn, Mail, Lock } from 'lucide-react';
+import taskLogo from '../assets/task_logo.png';
 
 export const Login: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -31,8 +32,12 @@ export const Login: React.FC = () => {
       <div className="max-w-md w-full">
         {/* Logo and Title */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-blue-600 to-blue-800 rounded-2xl shadow-lg mb-4">
-            <Building2 className="w-10 h-10 text-white" />
+          <div className="inline-flex items-center justify-center mb-4">
+            <img 
+              src={taskLogo} 
+              alt="Task Manager Logo" 
+              className="w-40 h-40 object-contain"
+            />
           </div>
           <h1 className="text-4xl font-bold text-gray-900 mb-2">Task Manager</h1>
           <p className="text-gray-600">Professional Management System</p>
@@ -114,11 +119,16 @@ export const Login: React.FC = () => {
             </button>
           </form>
 
-          <div className="mt-6 text-center">
+          <div className="mt-6 space-y-3 text-center">
             <p className="text-sm text-gray-600">
               Don't have an account?{' '}
               <Link to="/signup" className="font-medium text-blue-600 hover:text-blue-700">
                 Sign up
+              </Link>
+            </p>
+            <p className="text-sm">
+              <Link to="/forgot-password" className="font-medium text-blue-600 hover:text-blue-700">
+                Forgot your password?
               </Link>
             </p>
           </div>

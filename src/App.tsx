@@ -5,6 +5,7 @@ import { NotificationProvider } from './contexts/NotificationContext';
 import { Layout } from './components/Layout';
 import { Login } from './components/Login';
 import { Signup } from './components/Signup';
+import { ForgotPassword } from './components/ForgotPassword';
 import { Dashboard } from './components/Dashboard';
 import { TaskForm } from './components/TaskForm';
 import { TaskDetail } from './components/TaskDetail';
@@ -132,6 +133,7 @@ function App() {
             <Routes>
               <Route path="/login" element={<Login />} />
               <Route path="/signup" element={<Signup />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route
                   path="/"
                   element={
@@ -154,6 +156,16 @@ function App() {
                 />
                 <Route
                   path="/tasks/create"
+                  element={
+                    <PrivateRoute>
+                      <Layout>
+                        <TaskForm />
+                      </Layout>
+                    </PrivateRoute>
+                  }
+                />
+                <Route
+                  path="/tasks/edit/:id"
                   element={
                     <PrivateRoute>
                       <Layout>

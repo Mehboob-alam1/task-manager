@@ -12,6 +12,7 @@ import {
   LogOut,
   X,
 } from 'lucide-react';
+import taskLogo from '../assets/task_logo.png';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -34,7 +35,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle }) => {
     {
       path: '/dashboard',
       icon: Home,
-      label: user?.role === 'admin' ? 'Admin Dashboard' : 'My Dashboard',
+      label: user?.role === 'admin' ? 'Admin Dashboard' : user?.role === 'manager' ? 'Manager Dashboard' : 'My Dashboard',
       show: true,
     },
     {
@@ -95,8 +96,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle }) => {
           {/* Header */}
           <div className="flex items-center justify-between p-6 border-b border-blue-700">
             <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center">
-                <span className="text-blue-900 font-bold text-xl">TM</span>
+              <div className="w-16 h-16 bg-white rounded-lg flex items-center justify-center overflow-hidden">
+                <img 
+                  src={taskLogo} 
+                  alt="Logo" 
+                  className="w-full h-full object-contain p-1"
+                />
               </div>
               <div>
                 <h1 className="text-xl font-bold">Task Manager</h1>

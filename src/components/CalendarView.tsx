@@ -20,7 +20,7 @@ export const CalendarView: React.FC = () => {
       (tasks) => {
         setTasks(tasks);
       },
-      user.role === 'staff' ? user.uid : undefined
+      (user.role === 'staff') ? user.uid : undefined
     );
 
     return unsubscribe;

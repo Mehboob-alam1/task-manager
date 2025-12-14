@@ -78,6 +78,7 @@ export const TaskForm: React.FC = () => {
 
     try {
       // For staff, ensure they can only assign to themselves
+      // Manager and admin can assign to anyone
       const assignedEmployeeId = user?.role === 'staff' 
         ? user.uid 
         : formData.assignedEmployeeId;

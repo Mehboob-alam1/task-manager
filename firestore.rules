@@ -16,6 +16,11 @@ service cloud.firestore {
       return isAuthenticated() && getUserRole() == 'admin';
     }
     
+    // Helper function to check if user is manager or admin
+    function isManagerOrAdmin() {
+      return isAuthenticated() && (getUserRole() == 'manager' || getUserRole() == 'admin');
+    }
+    
     // Helper function to check if user is the assigned employee
     function isAssignedEmployee(taskId) {
       return isAuthenticated() && 
@@ -24,8 +29,8 @@ service cloud.firestore {
     
     // Users collection
     match /users/{userId} {
-      // Users can read their own data
-      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      // Users can read their own data, managers and admins can read all
+      allow read: if isAuthenticated() && (request.auth.uid == userId || isManagerOrAdmin());
       
       // Users can create their own user document during signup
       // Admins can create/update any user
@@ -50,22 +55,22 @@ service cloud.firestore {
       // Admins and staff can read all tasks (staff can view all, but only update their assigned)
       allow read: if isAuthenticated();
       
-      // Admins can create tasks for anyone, staff can create tasks for themselves
+      // Admins and managers can create tasks for anyone, staff can create tasks for themselves
       allow create: if isAuthenticated() &&
         request.resource.data.createdBy == request.auth.uid &&
         (
-          isAdmin() ||
+          isManagerOrAdmin() ||
           // Staff can create tasks, but only assign to themselves
           (request.resource.data.assignedEmployeeId == request.auth.uid)
         );
       
-      // Admins can update any task, staff can only update their assigned tasks
+      // Admins and managers can update any task, staff can only update their assigned tasks
       allow update: if isAuthenticated() && (
-        isAdmin() || 
+        isManagerOrAdmin() || 
         (resource.data.assignedEmployeeId == request.auth.uid &&
          // Staff can only update status and progressNotes
          request.resource.data.diff(resource.data).affectedKeys()
-           .hasOnly(['status', 'progressNotes', 'updatedAt']))
+           .hasOnly(['status', 'progressNotes', 'updatedAt', 'completedAt', 'daysTaken']))
       );
       
     // Only admins can delete tasks

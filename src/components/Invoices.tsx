@@ -61,7 +61,7 @@ export const Invoices: React.FC = () => {
   const getClients = () => {
     // For staff, only show clients for tasks assigned to them
     // For admin, show all clients
-    const relevantTasks = user?.role === 'admin' 
+    const relevantTasks = (user?.role === 'admin' || user?.role === 'manager')
       ? tasks 
       : tasks.filter(t => t.assignedEmployeeId === user?.uid);
     const clients = Array.from(new Set(relevantTasks.map((t) => t.clientName)));
@@ -74,10 +74,14 @@ export const Invoices: React.FC = () => {
   };
 
   const getFilteredInvoices = () => {
-    if (user?.role !== 'admin' || selectedStaffFilter === 'all') {
+    // Admin and manager can see all invoices, staff only their own
+    if ((user?.role === 'admin' || user?.role === 'manager') && selectedStaffFilter === 'all') {
       return invoices;
     }
-    return invoices.filter(inv => inv.createdBy === selectedStaffFilter);
+    if ((user?.role === 'admin' || user?.role === 'manager') && selectedStaffFilter !== 'all') {
+      return invoices.filter(inv => inv.createdBy === selectedStaffFilter);
+    }
+    return invoices; // Staff already filtered by subscribeToInvoices
   };
 
   // Get invoices for current week
@@ -205,14 +209,32 @@ export const Invoices: React.FC = () => {
     }
   };
 
-  const downloadInvoicePDF = (invoice: Invoice) => {
+  const downloadInvoicePDF = async (invoice: Invoice) => {
     const doc = new jsPDF();
     let yPos = 20;
 
+    // Load and add logo
+    try {
+      const logoImg = new Image();
+      logoImg.crossOrigin = 'anonymous';
+      await new Promise((resolve, reject) => {
+        logoImg.onload = resolve;
+        logoImg.onerror = reject;
+        logoImg.src = '/task_logo.png';
+      });
+      
+      // Add logo (bigger size: 50x50)
+      const logoWidth = 50;
+      const logoHeight = 50;
+      doc.addImage(logoImg, 'PNG', 20, yPos, logoWidth, logoHeight);
+    } catch (error) {
+      console.error('Error loading logo:', error);
+    }
+
     // Header
     doc.setFontSize(20);
-    doc.text('INVOICE', 105, yPos, { align: 'center' });
-    yPos += 15;
+    doc.text('INVOICE', 105, yPos + 15, { align: 'center' });
+    yPos += 35;
 
     // Invoice Details
     doc.setFontSize(12);
@@ -320,7 +342,7 @@ export const Invoices: React.FC = () => {
     return weekGroups;
   };
 
-  const downloadWeeklyInvoicesPDF = (invoices: Invoice[]) => {
+  const downloadWeeklyInvoicesPDF = async (invoices: Invoice[]) => {
     if (invoices.length === 0) {
       alert('No invoices selected');
       return;
@@ -329,6 +351,20 @@ export const Invoices: React.FC = () => {
     const weekGroups = groupInvoicesByWeek(invoices);
     const doc = new jsPDF();
     
+    // Load logo once
+    let logoImg: HTMLImageElement | null = null;
+    try {
+      logoImg = new Image();
+      logoImg.crossOrigin = 'anonymous';
+      await new Promise((resolve, reject) => {
+        logoImg!.onload = resolve;
+        logoImg!.onerror = reject;
+        logoImg!.src = '/task_logo.png';
+      });
+    } catch (error) {
+      console.error('Error loading logo:', error);
+    }
+    
     weekGroups.forEach((weekInvoices, weekKey) => {
       const weekStart = new Date(weekKey);
       const weekEnd = endOfWeek(weekStart, { weekStartsOn: 0 });
@@ -336,16 +372,23 @@ export const Invoices: React.FC = () => {
       let yPos = 20;
       let isFirstPage = true;
 
+      // Add logo on first page of each week
+      if (logoImg && isFirstPage) {
+        const logoWidth = 40;
+        const logoHeight = 40;
+        doc.addImage(logoImg, 'PNG', 20, yPos, logoWidth, logoHeight);
+      }
+
       // Week Header
       doc.setFontSize(18);
       doc.setFont('helvetica', 'bold');
       doc.text(
         `WEEKLY INVOICES: ${format(weekStart, 'MMM dd')} - ${format(weekEnd, 'MMM dd, yyyy')}`,
         105,
-        yPos,
+        yPos + 10,
         { align: 'center' }
       );
-      yPos += 15;
+      yPos += 30;
 
       weekInvoices.forEach((invoice, index) => {
         // Check if we need a new page (leave space for at least one invoice)
@@ -632,7 +675,7 @@ export const Invoices: React.FC = () => {
                   >
                     {saving ? 'Saving...' : 'Save Invoice'}
                   </button>
-                  {user?.role === 'admin' && (
+                  {(user?.role === 'admin' || user?.role === 'manager') && (
                     <>
                       <button
                         onClick={() => downloadInvoicePDF(generatedInvoice)}
@@ -650,9 +693,9 @@ export const Invoices: React.FC = () => {
                       </button>
                     </>
                   )}
-                  {user?.role !== 'admin' && (
+                  {user?.role === 'staff' && (
                     <button
-                      onClick={() => downloadInvoicePDF(generatedInvoice)}
+                      onClick={async () => await downloadInvoicePDF(generatedInvoice)}
                       className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
                     >
                       <Download className="w-4 h-4 mr-2" />
@@ -869,7 +912,7 @@ export const Invoices: React.FC = () => {
                     </p>
                     {getCurrentWeekInvoices().length > 0 && (
                       <button
-                        onClick={() => downloadWeeklyInvoicesPDF(getCurrentWeekInvoices())}
+                        onClick={async () => await downloadWeeklyInvoicesPDF(getCurrentWeekInvoices())}
                         className="inline-flex items-center px-3 py-1 border border-blue-300 rounded-md text-sm font-medium text-blue-700 bg-blue-50 hover:bg-blue-100"
                         title="Download all invoices for current week"
                       >
@@ -881,7 +924,7 @@ export const Invoices: React.FC = () => {
                 )}
               </div>
               <div className="flex items-center space-x-3">
-                {user?.role === 'admin' && users.length > 0 && (
+                {(user?.role === 'admin' || user?.role === 'manager') && users.length > 0 && (
                   <select
                     value={selectedStaffFilter}
                     onChange={(e) => {
@@ -898,14 +941,14 @@ export const Invoices: React.FC = () => {
                     ))}
                   </select>
                 )}
-                {user?.role === 'admin' && getFilteredInvoices().length > 0 && (
+                {(user?.role === 'admin' || user?.role === 'manager') && getFilteredInvoices().length > 0 && (
                   <div className="flex space-x-2">
                     {selectedInvoices.size > 0 && (
                       <>
                         <button
-                          onClick={() => {
+                          onClick={async () => {
                             const selected = getFilteredInvoices().filter(inv => selectedInvoices.has(inv.id));
-                            downloadMultipleInvoicesPDF(selected);
+                            await downloadMultipleInvoicesPDF(selected);
                           }}
                           className="inline-flex items-center px-3 py-1 border border-red-300 rounded-md text-sm font-medium text-red-700 bg-red-50 hover:bg-red-100"
                         >
@@ -950,7 +993,7 @@ export const Invoices: React.FC = () => {
             <div className="px-6 py-8 text-center text-gray-500">
               <FileText className="w-12 h-12 mx-auto text-gray-400 mb-3" />
               <p className="text-gray-500">No invoices found</p>
-              {user?.role === 'admin' && selectedStaffFilter !== 'all' && (
+              {(user?.role === 'admin' || user?.role === 'manager') && selectedStaffFilter !== 'all' && (
                 <p className="text-sm text-gray-400 mt-2">No invoices for selected staff member</p>
               )}
             </div>
@@ -993,7 +1036,7 @@ export const Invoices: React.FC = () => {
                       >
                         Edit
                       </button>
-                      {user?.role === 'admin' && (
+                      {(user?.role === 'admin' || user?.role === 'manager') && (
                         <>
                           <button
                             onClick={() => downloadInvoicePDF(invoice)}
@@ -1013,7 +1056,7 @@ export const Invoices: React.FC = () => {
                           </button>
                         </>
                       )}
-                      {user?.role !== 'admin' && (
+                      {user?.role === 'staff' && (
                         <button
                           onClick={() => downloadInvoicePDF(invoice)}
                           className="inline-flex items-center px-3 py-1 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"

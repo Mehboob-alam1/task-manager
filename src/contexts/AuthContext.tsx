@@ -1,12 +1,12 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { User } from '../types';
+import { User, UserRole } from '../types';
 import { subscribeToAuthState, login, logout, register } from '../firebase/auth';
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, displayName: string, role: 'admin' | 'staff') => Promise<void>;
+  register: (email: string, password: string, displayName: string, role: UserRole) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -64,7 +64,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     email: string,
     password: string,
     displayName: string,
-    role: 'admin' | 'staff'
+    role: UserRole
   ) => {
     const user = await register(email, password, displayName, role);
     setUser(user);

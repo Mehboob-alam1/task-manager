@@ -93,7 +93,7 @@ export const TaskDetail: React.FC = () => {
             <h1 className="text-3xl font-bold text-gray-900">{task.title}</h1>
             <p className="mt-2 text-gray-600">Client: {task.clientName}</p>
           </div>
-          {user?.role === 'admin' && (
+          {(user?.role === 'admin' || user?.role === 'manager') && (
             <div className="flex space-x-2">
               <button
                 onClick={() => navigate(`/tasks/edit/${task.id}`)}
