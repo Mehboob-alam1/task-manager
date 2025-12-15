@@ -289,6 +289,19 @@ export const Invoices: React.FC = () => {
     doc.setFont('helvetica', 'normal');
     doc.text(`Status: ${invoice.status.toUpperCase()}`, 20, yPos);
 
+    // Footer - apply to all pages
+    const pageCount = doc.getNumberOfPages();
+    doc.setFontSize(8);
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.text(
+        '2024 Omega Tax - Version 1.0 - All right reserrved.',
+        105,
+        290,
+        { align: 'center' }
+      );
+    }
+
     doc.save(`${invoice.invoiceNumber}.pdf`);
   };
 
@@ -495,6 +508,19 @@ export const Invoices: React.FC = () => {
       );
       yPos += 15;
     });
+
+    // Footer - apply to all pages
+    const pageCount = doc.getNumberOfPages();
+    doc.setFontSize(8);
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.text(
+        '2024 Omega Tax - Version 1.0 - All right reserrved.',
+        105,
+        290,
+        { align: 'center' }
+      );
+    }
 
     const fileName = `Weekly_Invoices_${format(new Date(), 'yyyyMMdd')}.pdf`;
     doc.save(fileName);
