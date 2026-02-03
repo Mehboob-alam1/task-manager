@@ -322,7 +322,7 @@ export const Invoices: React.FC = () => {
     for (let i = 1; i <= pageCount; i++) {
       doc.setPage(i);
       doc.text(
-        '2024 Omega Tax - Version 1.0 - All right reserrved.',
+        '2024 Omega Tax - Version 1.0 - All rights reserved.',
         105,
         290,
         { align: 'center' }
@@ -547,7 +547,7 @@ export const Invoices: React.FC = () => {
     for (let i = 1; i <= pageCount; i++) {
       doc.setPage(i);
       doc.text(
-        '2024 Omega Tax - Version 1.0 - All right reserrved.',
+        '2024 Omega Tax - Version 1.0 - All rights reserved.',
         105,
         290,
         { align: 'center' }
@@ -724,7 +724,7 @@ export const Invoices: React.FC = () => {
     for (let i = 1; i <= pageCount; i++) {
       doc.setPage(i);
       doc.text(
-        '2024 Omega Tax - Version 1.0 - All right reserrved.',
+        '2024 Omega Tax - Version 1.0 - All rights reserved.',
         105,
         290,
         { align: 'center' }
