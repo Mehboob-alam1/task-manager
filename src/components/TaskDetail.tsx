@@ -74,6 +74,8 @@ export const TaskDetail: React.FC = () => {
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
+      case 'Urgent':
+        return 'bg-red-200 text-red-900';
       case 'High':
         return 'bg-red-100 text-red-800';
       case 'Medium':
@@ -212,4 +214,3 @@ export const TaskDetail: React.FC = () => {
     </div>
   );
 };
-

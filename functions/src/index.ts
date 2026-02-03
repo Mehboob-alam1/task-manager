@@ -1,9 +1,54 @@
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
+import * as nodemailer from 'nodemailer';
 
 admin.initializeApp();
 
 const db = admin.firestore();
+
+const smtpConfig = functions.config().smtp as
+  | {
+      host?: string;
+      port?: string;
+      secure?: string;
+      user?: string;
+      pass?: string;
+      from?: string;
+    }
+  | undefined;
+
+const transporter =
+  smtpConfig?.host && smtpConfig?.user && smtpConfig?.pass
+    ? nodemailer.createTransport({
+        host: smtpConfig.host,
+        port: smtpConfig.port ? Number(smtpConfig.port) : 587,
+        secure: smtpConfig.secure === 'true',
+        auth: {
+          user: smtpConfig.user,
+          pass: smtpConfig.pass,
+        },
+      })
+    : null;
+
+const fromAddress = smtpConfig?.from || smtpConfig?.user;
+
+const sendOverdueEmail = async (to: string, taskTitle: string, deadline: Date) => {
+  if (!transporter || !fromAddress) {
+    console.log('SMTP not configured. Skipping overdue email.');
+    return;
+  }
+
+  const subject = `Overdue Task: ${taskTitle}`;
+  const deadlineText = deadline.toLocaleString('en-US', { timeZone: 'America/New_York' });
+  const text = `Task "${taskTitle}" is overdue. Deadline was ${deadlineText}. Please review.`;
+
+  await transporter.sendMail({
+    from: fromAddress,
+    to,
+    subject,
+    text,
+  });
+};
 
 // Daily Report Generation (runs daily at 9 AM)
 export const generateDailyReport = functions.pubsub
@@ -185,6 +230,7 @@ export const checkOverdueTasks = functions.pubsub
             // Send FCM notification
             const userDoc = await db.collection('users').doc((task as any).assignedEmployeeId).get();
             const fcmToken = userDoc.data()?.fcmToken;
+            const userEmail = userDoc.data()?.email;
             if (fcmToken) {
               await admin.messaging().send({
                 token: fcmToken,
@@ -193,6 +239,17 @@ export const checkOverdueTasks = functions.pubsub
                   body: `Task "${(task as any).title}" is now overdue`,
                 },
               });
+            }
+            if (userEmail) {
+              try {
+                await sendOverdueEmail(
+                  userEmail,
+                  (task as any).title,
+                  (task as any).deadline.toDate()
+                );
+              } catch (error) {
+                console.error('Error sending overdue email:', error);
+              }
             }
           }
         }
@@ -228,4 +285,3 @@ export const onTaskStatusUpdate = functions.firestore
 
     return null;
   });
-

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Task, Invoice, User } from '../types';
 import { subscribeToTasks, createInvoice, subscribeToInvoices, getUsers, updateInvoice } from '../firebase/firestore';
-import { format, startOfWeek, endOfWeek, startOfDay, endOfDay } from 'date-fns';
+import { format, startOfWeek, endOfWeek, startOfDay, endOfDay, startOfMonth, endOfMonth } from 'date-fns';
 import { Download, PlusCircle, FileText, FileDown } from 'lucide-react';
 import jsPDF from 'jspdf';
 import * as XLSX from 'xlsx';
@@ -13,7 +13,7 @@ export const Invoices: React.FC = () => {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
-  const [invoiceType, setInvoiceType] = useState<'daily' | 'weekly'>('daily');
+  const [invoiceType, setInvoiceType] = useState<'daily' | 'weekly' | 'monthly'>('daily');
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [selectedClient, setSelectedClient] = useState('');
   const [generatedInvoice, setGeneratedInvoice] = useState<Invoice | null>(null);
@@ -22,6 +22,19 @@ export const Invoices: React.FC = () => {
   const [viewMode, setViewMode] = useState<'create' | 'list'>('create');
   const [selectedStaffFilter, setSelectedStaffFilter] = useState<string>('all');
   const [selectedInvoices, setSelectedInvoices] = useState<Set<string>>(new Set());
+
+  const getPeriodLabel = (period: Invoice['period']) => {
+    switch (period) {
+      case 'daily':
+        return 'Daily';
+      case 'weekly':
+        return 'Weekly';
+      case 'monthly':
+        return 'Monthly';
+      default:
+        return 'Daily';
+    }
+  };
 
   useEffect(() => {
     if (!user) return;
@@ -96,6 +109,17 @@ export const Invoices: React.FC = () => {
     });
   };
 
+  const getCurrentMonthInvoices = () => {
+    const now = new Date();
+    const monthStart = startOfMonth(now);
+    const monthEnd = endOfMonth(now);
+
+    return getFilteredInvoices().filter((invoice) => {
+      const invoiceDate = new Date(invoice.invoiceDate);
+      return invoiceDate >= monthStart && invoiceDate <= monthEnd;
+    });
+  };
+
   const generateInvoice = () => {
     if (!selectedClient) {
       alert('Please select a client');
@@ -108,9 +132,12 @@ export const Invoices: React.FC = () => {
     if (invoiceType === 'daily') {
       periodStart = startOfDay(selectedDate);
       periodEnd = endOfDay(selectedDate);
-    } else {
+    } else if (invoiceType === 'weekly') {
       periodStart = startOfWeek(selectedDate, { weekStartsOn: 0 });
       periodEnd = endOfWeek(selectedDate, { weekStartsOn: 0 });
+    } else {
+      periodStart = startOfMonth(selectedDate);
+      periodEnd = endOfMonth(selectedDate);
     }
 
     // Filter tasks for the selected client and period
@@ -123,7 +150,7 @@ export const Invoices: React.FC = () => {
     });
 
     if (relevantTasks.length === 0) {
-      alert('No completed tasks found for this client in the selected period');
+      alert('No tasks found for this client in the selected period');
       return;
     }
 
@@ -211,7 +238,8 @@ export const Invoices: React.FC = () => {
 
   const downloadInvoicePDF = async (invoice: Invoice) => {
     const doc = new jsPDF();
-    let yPos = 20;
+    // Start content a bit lower to leave space for logo and header
+    let yPos = 50;
 
     // Load and add logo
     try {
@@ -223,18 +251,17 @@ export const Invoices: React.FC = () => {
         logoImg.src = '/task_logo.png';
       });
       
-      // Add logo (bigger size: 50x50)
+      // Add logo (bigger size: 50x50) at top-left corner
       const logoWidth = 50;
       const logoHeight = 50;
-      doc.addImage(logoImg, 'PNG', 20, yPos, logoWidth, logoHeight);
+      doc.addImage(logoImg, 'PNG', 15, 10, logoWidth, logoHeight);
     } catch (error) {
       console.error('Error loading logo:', error);
     }
 
-    // Header
+    // Header centered near the top
     doc.setFontSize(20);
-    doc.text('INVOICE', 105, yPos + 15, { align: 'center' });
-    yPos += 35;
+    doc.text('INVOICE', 105, 25, { align: 'center' });
 
     // Invoice Details
     doc.setFontSize(12);
@@ -246,7 +273,7 @@ export const Invoices: React.FC = () => {
     yPos += 7;
     doc.text(`Due Date: ${format(invoice.dueDate, 'MMMM dd, yyyy')}`, 20, yPos);
     yPos += 7;
-    doc.text(`Period: ${invoice.period === 'daily' ? 'Daily' : 'Weekly'}`, 20, yPos);
+    doc.text(`Period: ${getPeriodLabel(invoice.period)}`, 20, yPos);
     yPos += 10;
 
     // Tasks Table Header
@@ -312,7 +339,7 @@ export const Invoices: React.FC = () => {
       ['Client', invoice.clientName],
       ['Invoice Date', format(invoice.invoiceDate, 'MMMM dd, yyyy')],
       ['Due Date', format(invoice.dueDate, 'MMMM dd, yyyy')],
-      ['Period', invoice.period === 'daily' ? 'Daily' : 'Weekly'],
+      ['Period', getPeriodLabel(invoice.period)],
       [],
       ['TASKS'],
       ['Task Title', 'Category', 'Type', 'Hours', 'Rate', 'Amount'],
@@ -382,42 +409,47 @@ export const Invoices: React.FC = () => {
       const weekStart = new Date(weekKey);
       const weekEnd = endOfWeek(weekStart, { weekStartsOn: 0 });
       
-      let yPos = 20;
+      // Start content a bit lower to leave space for logo and header
+      let yPos = 50;
       let isFirstPage = true;
 
-      // Add logo on first page of each week
+      // Add logo on first page of each week (top-left corner)
       if (logoImg && isFirstPage) {
         const logoWidth = 40;
         const logoHeight = 40;
-        doc.addImage(logoImg, 'PNG', 20, yPos, logoWidth, logoHeight);
+        doc.addImage(logoImg, 'PNG', 15, 10, logoWidth, logoHeight);
       }
 
-      // Week Header
+      // Week Header centered near the top
       doc.setFontSize(18);
       doc.setFont('helvetica', 'bold');
       doc.text(
         `WEEKLY INVOICES: ${format(weekStart, 'MMM dd')} - ${format(weekEnd, 'MMM dd, yyyy')}`,
         105,
-        yPos + 10,
+        25,
         { align: 'center' }
       );
-      yPos += 30;
 
       weekInvoices.forEach((invoice, index) => {
         // Check if we need a new page (leave space for at least one invoice)
         if (yPos > 200 && !isFirstPage) {
           doc.addPage();
-          yPos = 20;
+          yPos = 50;
+          // Re-add logo on new page
+          if (logoImg) {
+            const logoWidth = 40;
+            const logoHeight = 40;
+            doc.addImage(logoImg, 'PNG', 15, 10, logoWidth, logoHeight);
+          }
           // Re-add week header on new page
           doc.setFontSize(18);
           doc.setFont('helvetica', 'bold');
           doc.text(
             `WEEKLY INVOICES: ${format(weekStart, 'MMM dd')} - ${format(weekEnd, 'MMM dd, yyyy')}`,
             105,
-            yPos,
+            25,
             { align: 'center' }
           );
-          yPos += 15;
         }
         isFirstPage = false;
 
@@ -439,7 +471,7 @@ export const Invoices: React.FC = () => {
         doc.text(`Client: ${invoice.clientName}`, 20, yPos);
         doc.text(`Date: ${format(invoice.invoiceDate, 'MMM dd, yyyy')}`, 100, yPos);
         yPos += 6;
-        doc.text(`Period: ${invoice.period === 'daily' ? 'Daily' : 'Weekly'}`, 20, yPos);
+        doc.text(`Period: ${getPeriodLabel(invoice.period)}`, 20, yPos);
         doc.text(`Status: ${invoice.status.toUpperCase()}`, 100, yPos);
         yPos += 8;
 
@@ -526,6 +558,183 @@ export const Invoices: React.FC = () => {
     doc.save(fileName);
   };
 
+  const groupInvoicesByMonth = (invoices: Invoice[]): Map<string, Invoice[]> => {
+    const monthGroups = new Map<string, Invoice[]>();
+
+    invoices.forEach((invoice) => {
+      const invoiceDate = new Date(invoice.invoiceDate);
+      const monthStart = startOfMonth(invoiceDate);
+      const monthKey = format(monthStart, 'yyyy-MM');
+
+      if (!monthGroups.has(monthKey)) {
+        monthGroups.set(monthKey, []);
+      }
+      monthGroups.get(monthKey)!.push(invoice);
+    });
+
+    return monthGroups;
+  };
+
+  const downloadMonthlyInvoicesPDF = async (invoices: Invoice[]) => {
+    if (invoices.length === 0) {
+      alert('No invoices selected');
+      return;
+    }
+
+    const monthGroups = groupInvoicesByMonth(invoices);
+    const doc = new jsPDF();
+
+    // Load logo once
+    let logoImg: HTMLImageElement | null = null;
+    try {
+      logoImg = new Image();
+      logoImg.crossOrigin = 'anonymous';
+      await new Promise((resolve, reject) => {
+        logoImg!.onload = resolve;
+        logoImg!.onerror = reject;
+        logoImg!.src = '/task_logo.png';
+      });
+    } catch (error) {
+      console.error('Error loading logo:', error);
+    }
+
+    monthGroups.forEach((monthInvoices, monthKey) => {
+      const monthStart = new Date(`${monthKey}-01T00:00:00`);
+
+      let yPos = 50;
+      let isFirstPage = true;
+
+      if (logoImg && isFirstPage) {
+        const logoWidth = 40;
+        const logoHeight = 40;
+        doc.addImage(logoImg, 'PNG', 15, 10, logoWidth, logoHeight);
+      }
+
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'bold');
+      doc.text(
+        `MONTHLY INVOICES: ${format(monthStart, 'MMMM yyyy')}`,
+        105,
+        25,
+        { align: 'center' }
+      );
+
+      monthInvoices.forEach((invoice, index) => {
+        if (yPos > 200 && !isFirstPage) {
+          doc.addPage();
+          yPos = 50;
+          if (logoImg) {
+            const logoWidth = 40;
+            const logoHeight = 40;
+            doc.addImage(logoImg, 'PNG', 15, 10, logoWidth, logoHeight);
+          }
+          doc.setFontSize(18);
+          doc.setFont('helvetica', 'bold');
+          doc.text(
+            `MONTHLY INVOICES: ${format(monthStart, 'MMMM yyyy')}`,
+            105,
+            25,
+            { align: 'center' }
+          );
+        }
+        isFirstPage = false;
+
+        if (index > 0) {
+          doc.line(20, yPos, 190, yPos);
+          yPos += 10;
+        }
+
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`Invoice #${invoice.invoiceNumber}`, 20, yPos);
+        yPos += 8;
+
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`Client: ${invoice.clientName}`, 20, yPos);
+        doc.text(`Date: ${format(invoice.invoiceDate, 'MMM dd, yyyy')}`, 100, yPos);
+        yPos += 6;
+        doc.text(`Period: ${getPeriodLabel(invoice.period)}`, 20, yPos);
+        doc.text(`Status: ${invoice.status.toUpperCase()}`, 100, yPos);
+        yPos += 8;
+
+        doc.setFontSize(9);
+        doc.text('Task', 20, yPos);
+        doc.text('Hours', 100, yPos);
+        doc.text('Rate', 130, yPos);
+        doc.text('Amount', 160, yPos);
+        yPos += 5;
+        doc.line(20, yPos, 190, yPos);
+        yPos += 5;
+
+        invoice.tasks.forEach((task) => {
+          if (yPos > 270) {
+            doc.addPage();
+            yPos = 20;
+            doc.setFontSize(18);
+            doc.setFont('helvetica', 'bold');
+            doc.text(
+              `MONTHLY INVOICES: ${format(monthStart, 'MMMM yyyy')}`,
+              105,
+              yPos,
+              { align: 'center' }
+            );
+            yPos += 15;
+          }
+          doc.setFontSize(9);
+          doc.text(task.taskTitle.substring(0, 35), 20, yPos);
+          doc.text(task.hours.toString(), 100, yPos);
+          doc.text(`$${task.rate.toFixed(2)}`, 130, yPos);
+          doc.text(`$${task.amount.toFixed(2)}`, 160, yPos);
+          yPos += 5;
+        });
+
+        yPos += 3;
+        doc.line(20, yPos, 190, yPos);
+        yPos += 5;
+
+        doc.setFontSize(10);
+        doc.text(`Subtotal: $${invoice.subtotal.toFixed(2)}`, 130, yPos, { align: 'right' });
+        yPos += 5;
+        doc.text(`Discount: $${invoice.discount.toFixed(2)}`, 130, yPos, { align: 'right' });
+        yPos += 5;
+        doc.setFont('helvetica', 'bold');
+        doc.text(`TOTAL: $${invoice.total.toFixed(2)}`, 130, yPos, { align: 'right' });
+        yPos += 8;
+        doc.setFont('helvetica', 'normal');
+      });
+
+      const monthTotal = monthInvoices.reduce((sum, inv) => sum + inv.total, 0);
+      yPos += 5;
+      doc.line(20, yPos, 190, yPos);
+      yPos += 8;
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text(
+        `MONTH TOTAL: $${monthTotal.toFixed(2)}`,
+        130,
+        yPos,
+        { align: 'right' }
+      );
+      yPos += 15;
+    });
+
+    const pageCount = doc.getNumberOfPages();
+    doc.setFontSize(8);
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.text(
+        '2024 Omega Tax - Version 1.0 - All right reserrved.',
+        105,
+        290,
+        { align: 'center' }
+      );
+    }
+
+    const fileName = `Monthly_Invoices_${format(new Date(), 'yyyyMMdd')}.pdf`;
+    doc.save(fileName);
+  };
+
   const downloadMultipleInvoicesPDF = (invoices: Invoice[]) => {
     // Use weekly grouping by default
     downloadWeeklyInvoicesPDF(invoices);
@@ -544,7 +753,7 @@ export const Invoices: React.FC = () => {
         ['Client', invoice.clientName],
         ['Invoice Date', format(invoice.invoiceDate, 'MMMM dd, yyyy')],
         ['Due Date', format(invoice.dueDate, 'MMMM dd, yyyy')],
-        ['Period', invoice.period === 'daily' ? 'Daily' : 'Weekly'],
+        ['Period', getPeriodLabel(invoice.period)],
         [],
         ['TASKS'],
         ['Task Title', 'Category', 'Type', 'Hours', 'Rate', 'Amount'],
@@ -579,9 +788,9 @@ export const Invoices: React.FC = () => {
 
   return (
     <div className="px-4 py-6">
-      <div className="mb-6 flex justify-between items-center">
+      <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <h1 className="text-3xl font-bold text-gray-900">Invoices</h1>
-        <div className="flex space-x-2">
+        <div className="flex flex-wrap gap-2">
           <button
             onClick={() => setViewMode('create')}
             className={`px-4 py-2 rounded-md text-sm font-medium ${
@@ -624,7 +833,7 @@ export const Invoices: React.FC = () => {
                       name="invoiceType"
                       value="daily"
                       checked={invoiceType === 'daily'}
-                      onChange={(e) => setInvoiceType(e.target.value as 'daily' | 'weekly')}
+                      onChange={(e) => setInvoiceType(e.target.value as 'daily' | 'weekly' | 'monthly')}
                       className="mr-2"
                     />
                     Daily Invoice
@@ -635,17 +844,28 @@ export const Invoices: React.FC = () => {
                       name="invoiceType"
                       value="weekly"
                       checked={invoiceType === 'weekly'}
-                      onChange={(e) => setInvoiceType(e.target.value as 'daily' | 'weekly')}
+                      onChange={(e) => setInvoiceType(e.target.value as 'daily' | 'weekly' | 'monthly')}
                       className="mr-2"
                     />
                     Weekly Invoice
+                  </label>
+                  <label className="flex items-center">
+                    <input
+                      type="radio"
+                      name="invoiceType"
+                      value="monthly"
+                      checked={invoiceType === 'monthly'}
+                      onChange={(e) => setInvoiceType(e.target.value as 'daily' | 'weekly' | 'monthly')}
+                      className="mr-2"
+                    />
+                    Monthly Invoice
                   </label>
                 </div>
               </div>
 
               <div>
                 <label htmlFor="selectedDate" className="block text-sm font-medium text-gray-700 mb-2">
-                  {invoiceType === 'daily' ? 'Date' : 'Week Of'}
+                  {invoiceType === 'daily' ? 'Date' : invoiceType === 'weekly' ? 'Week Of' : 'Month Of'}
                 </label>
                 <input
                   type="date"
@@ -920,8 +1140,8 @@ export const Invoices: React.FC = () => {
         </>
       ) : (
         <div className="bg-white shadow rounded-lg overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <div className="flex justify-between items-center">
+          <div className="px-4 sm:px-6 py-4 border-b border-gray-200">
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div>
                 <h2 className="text-lg font-semibold text-gray-900">
                   {user?.role === 'admin' ? 'All Invoices' : 'My Invoices'}
@@ -946,10 +1166,20 @@ export const Invoices: React.FC = () => {
                         Download This Week ({getCurrentWeekInvoices().length})
                       </button>
                     )}
+                    {getCurrentMonthInvoices().length > 0 && (
+                      <button
+                        onClick={async () => await downloadMonthlyInvoicesPDF(getCurrentMonthInvoices())}
+                        className="inline-flex items-center px-3 py-1 border border-purple-300 rounded-md text-sm font-medium text-purple-700 bg-purple-50 hover:bg-purple-100"
+                        title="Download all invoices for current month"
+                      >
+                        <FileDown className="w-4 h-4 mr-1" />
+                        Download This Month ({getCurrentMonthInvoices().length})
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
-              <div className="flex items-center space-x-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:space-x-3">
                 {(user?.role === 'admin' || user?.role === 'manager') && users.length > 0 && (
                   <select
                     value={selectedStaffFilter}
@@ -968,7 +1198,7 @@ export const Invoices: React.FC = () => {
                   </select>
                 )}
                 {(user?.role === 'admin' || user?.role === 'manager') && getFilteredInvoices().length > 0 && (
-                  <div className="flex space-x-2">
+                  <div className="flex flex-wrap gap-2">
                     {selectedInvoices.size > 0 && (
                       <>
                         <button
@@ -1042,7 +1272,7 @@ export const Invoices: React.FC = () => {
                             )}
                           </div>
                           <p className="text-sm text-gray-500">
-                            Client: {invoice.clientName} • {invoice.period === 'daily' ? 'Daily' : 'Weekly'} Invoice
+                            Client: {invoice.clientName} • {getPeriodLabel(invoice.period)} Invoice
                           </p>
                           <p className="text-sm text-gray-500">
                             Period: {format(invoice.periodStart, 'MMM dd')} - {format(invoice.periodEnd, 'MMM dd, yyyy')} • 

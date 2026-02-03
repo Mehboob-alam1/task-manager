@@ -16,7 +16,7 @@ import {
   DocumentData,
 } from 'firebase/firestore';
 import { db } from './config';
-import { Task, User, Notification, DailyReport, Invoice } from '../types';
+import { Task, User, Notification, DailyReport, Invoice, UserPermissions, Permission, ThirdPartyApplication, SignupRequest } from '../types';
 
 // Check if Firestore is configured
 if (!db) {
@@ -80,6 +80,10 @@ export const createUser = async (uid: string, userData: Omit<User, 'uid' | 'crea
 
 export const updateUser = async (uid: string, updates: Partial<User>): Promise<void> => {
   await updateDoc(doc(db, 'users', uid), updates);
+};
+
+export const deleteUser = async (uid: string): Promise<void> => {
+  await deleteDoc(doc(db, 'users', uid));
 };
 
 // Tasks collection
@@ -406,3 +410,177 @@ export const subscribeToInvoices = (
   });
 };
 
+// User Permissions collection
+export const userPermissionsCollection = collection(db, 'userPermissions');
+
+export const getUserPermissions = async (userId: string): Promise<UserPermissions | null> => {
+  if (!db) return null;
+  const q = query(userPermissionsCollection, where('userId', '==', userId));
+  const snapshot = await getDocs(q);
+  if (snapshot.empty) return null;
+  const doc = snapshot.docs[0];
+  const data = doc.data();
+  return {
+    userId: data.userId,
+    permissions: data.permissions || [],
+    createdAt: data.createdAt?.toDate() || new Date(),
+    updatedAt: data.updatedAt?.toDate() || new Date(),
+  };
+};
+
+export const setUserPermissions = async (userId: string, permissions: Permission[]): Promise<void> => {
+  if (!db) throw new Error('Firestore not initialized');
+  const q = query(userPermissionsCollection, where('userId', '==', userId));
+  const snapshot = await getDocs(q);
+  
+  if (snapshot.empty) {
+    // Create new permissions document
+    await addDoc(userPermissionsCollection, {
+      userId,
+      permissions,
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now(),
+    });
+  } else {
+    // Update existing permissions
+    const docRef = snapshot.docs[0].ref;
+    await updateDoc(docRef, {
+      permissions,
+      updatedAt: Timestamp.now(),
+    });
+  }
+};
+
+export const addUserPermission = async (userId: string, permission: Permission): Promise<void> => {
+  const existing = await getUserPermissions(userId);
+  const currentPermissions = existing?.permissions || [];
+  if (!currentPermissions.includes(permission)) {
+    await setUserPermissions(userId, [...currentPermissions, permission]);
+  }
+};
+
+export const removeUserPermission = async (userId: string, permission: Permission): Promise<void> => {
+  const existing = await getUserPermissions(userId);
+  const currentPermissions = existing?.permissions || [];
+  await setUserPermissions(userId, currentPermissions.filter(p => p !== permission));
+};
+
+// Third Party Applications collection
+export const thirdPartyAppsCollection = collection(db, 'thirdPartyApplications');
+
+export const getThirdPartyApplications = async (): Promise<ThirdPartyApplication[]> => {
+  if (!db) return [];
+  const q = query(thirdPartyAppsCollection, orderBy('createdAt', 'desc'));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map((doc) => {
+    const data = doc.data();
+    return {
+      id: doc.id,
+      ...data,
+      createdAt: data.createdAt?.toDate() || new Date(),
+      updatedAt: data.updatedAt?.toDate() || new Date(),
+      lastUsedAt: data.lastUsedAt?.toDate(),
+    } as ThirdPartyApplication;
+  });
+};
+
+export const getThirdPartyApplication = async (appId: string): Promise<ThirdPartyApplication | null> => {
+  if (!db) return null;
+  const docRef = doc(thirdPartyAppsCollection, appId);
+  const docSnap = await getDoc(docRef);
+  if (!docSnap.exists()) return null;
+  const data = docSnap.data();
+  return {
+    id: docSnap.id,
+    ...data,
+    createdAt: data.createdAt?.toDate() || new Date(),
+    updatedAt: data.updatedAt?.toDate() || new Date(),
+    lastUsedAt: data.lastUsedAt?.toDate(),
+  } as ThirdPartyApplication;
+};
+
+export const createThirdPartyApplication = async (
+  appData: Omit<ThirdPartyApplication, 'id' | 'createdAt' | 'updatedAt'>
+): Promise<string> => {
+  if (!db) throw new Error('Firestore not initialized');
+  const docRef = await addDoc(thirdPartyAppsCollection, {
+    ...appData,
+    createdAt: Timestamp.now(),
+    updatedAt: Timestamp.now(),
+  });
+  return docRef.id;
+};
+
+export const updateThirdPartyApplication = async (
+  appId: string,
+  updates: Partial<ThirdPartyApplication>
+): Promise<void> => {
+  if (!db) throw new Error('Firestore not initialized');
+  const docRef = doc(thirdPartyAppsCollection, appId);
+  await updateDoc(docRef, {
+    ...updates,
+    updatedAt: Timestamp.now(),
+  });
+};
+
+export const deleteThirdPartyApplication = async (appId: string): Promise<void> => {
+  if (!db) throw new Error('Firestore not initialized');
+  await deleteDoc(doc(thirdPartyAppsCollection, appId));
+};
+
+// Signup Requests collection
+export const signupRequestsCollection = collection(db, 'signupRequests');
+
+export const getSignupRequests = async (status?: 'pending' | 'approved' | 'rejected'): Promise<SignupRequest[]> => {
+  if (!db) return [];
+  let q;
+  if (status) {
+    q = query(
+      signupRequestsCollection,
+      where('status', '==', status),
+      orderBy('requestedAt', 'desc')
+    );
+  } else {
+    q = query(signupRequestsCollection, orderBy('requestedAt', 'desc'));
+  }
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map((doc) => {
+    const data = doc.data();
+    return {
+      id: doc.id,
+      ...data,
+      requestedAt: data.requestedAt?.toDate() || new Date(),
+      reviewedAt: data.reviewedAt?.toDate(),
+    } as SignupRequest;
+  });
+};
+
+export const createSignupRequest = async (
+  requestData: Omit<SignupRequest, 'id' | 'requestedAt' | 'status'>
+): Promise<string> => {
+  if (!db) throw new Error('Firestore not initialized');
+  const docRef = await addDoc(signupRequestsCollection, {
+    ...requestData,
+    status: 'pending' as const,
+    requestedAt: Timestamp.now(),
+  });
+  return docRef.id;
+};
+
+export const updateSignupRequest = async (
+  requestId: string,
+  updates: Partial<SignupRequest>
+): Promise<void> => {
+  if (!db) throw new Error('Firestore not initialized');
+  const docRef = doc(signupRequestsCollection, requestId);
+  const updateData: any = { ...updates };
+  if (updates.reviewedAt) {
+    updateData.reviewedAt = Timestamp.fromDate(updates.reviewedAt);
+  }
+  await updateDoc(docRef, updateData);
+};
+
+export const deleteSignupRequest = async (requestId: string): Promise<void> => {
+  if (!db) throw new Error('Firestore not initialized');
+  await deleteDoc(doc(signupRequestsCollection, requestId));
+};

@@ -14,6 +14,9 @@ import { DailyReports } from './components/DailyReports';
 import { Notifications } from './components/Notifications';
 import { UserManagement } from './components/UserManagement';
 import { Invoices } from './components/Invoices';
+import { ThirdPartyApps } from './components/ThirdPartyApps';
+import { SignupApproval } from './components/SignupApproval';
+import { UserPermissions } from './components/UserPermissions';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { SetupMessage } from './components/SetupMessage';
 import { isFirebaseConfigured } from './firebase/config';
@@ -242,6 +245,36 @@ function App() {
                         <Invoices />
                       </Layout>
                     </PrivateRoute>
+                  }
+                />
+                <Route
+                  path="/applications"
+                  element={
+                    <AdminRoute>
+                      <Layout>
+                        <ThirdPartyApps />
+                      </Layout>
+                    </AdminRoute>
+                  }
+                />
+                <Route
+                  path="/signup-approval"
+                  element={
+                    <AdminRoute>
+                      <Layout>
+                        <SignupApproval />
+                      </Layout>
+                    </AdminRoute>
+                  }
+                />
+                <Route
+                  path="/permissions"
+                  element={
+                    <AdminRoute>
+                      <Layout>
+                        <UserPermissions />
+                      </Layout>
+                    </AdminRoute>
                   }
                 />
               </Routes>

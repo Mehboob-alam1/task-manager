@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { User, UserRole } from '../types';
-import { getUsers, updateUser } from '../firebase/firestore';
+import { deleteUser, getUsers, updateUser } from '../firebase/firestore';
 import { UserPlus, Shield, User as UserIcon } from 'lucide-react';
 
 export const UserManagement: React.FC = () => {
@@ -47,6 +47,28 @@ export const UserManagement: React.FC = () => {
     } catch (error) {
       console.error('Failed to update user role:', error);
       alert('Failed to update user role');
+    }
+  };
+
+  const handleDeleteUser = async (targetUser: User) => {
+    if (targetUser.uid === currentUser?.uid) {
+      alert('You cannot delete your own account.');
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Delete ${targetUser.displayName || targetUser.email}?\n\nThis will permanently remove the user account. Reports and files created by this user will remain in the database.`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      await deleteUser(targetUser.uid);
+      const updatedUsers = await getUsers();
+      setUsers(updatedUsers);
+    } catch (error) {
+      console.error('Failed to delete user:', error);
+      alert('Failed to delete user');
     }
   };
 
@@ -193,6 +215,15 @@ export const UserManagement: React.FC = () => {
                       <option value="admin">Admin</option>
                     </select>
                   )}
+                  {user.uid !== currentUser?.uid && (
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteUser(user)}
+                      className="text-sm font-medium text-red-700 border border-red-200 rounded-md px-3 py-1 hover:bg-red-50"
+                    >
+                      Delete
+                    </button>
+                  )}
                 </div>
               </div>
             </li>
@@ -202,4 +233,3 @@ export const UserManagement: React.FC = () => {
     </div>
   );
 };
-

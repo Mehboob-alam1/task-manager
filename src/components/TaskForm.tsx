@@ -26,6 +26,13 @@ export const TaskForm: React.FC = () => {
     taskType: '',
   });
 
+  const taskTypeHelp: Record<string, string> = {
+    'Marked Financial Statements':
+      'Prepared financial statements without an audit opinion (internal/management-use).',
+    'Audit Services':
+      'Independent examination that provides assurance on financial statements.',
+  };
+
   useEffect(() => {
     if (!user) {
       navigate('/login');
@@ -34,10 +41,14 @@ export const TaskForm: React.FC = () => {
 
     // For admin, load all staff users for assignment
     // For staff, they can only create tasks for themselves
-    if (user.role === 'admin') {
+    if (user.role === 'admin' || user.role === 'manager') {
       const loadUsers = async () => {
         const allUsers = await getUsers();
-        setUsers(allUsers.filter((u) => u.role === 'staff'));
+        if (user.role === 'admin') {
+          setUsers(allUsers.filter((u) => u.role !== 'admin'));
+        } else {
+          setUsers(allUsers.filter((u) => u.role === 'staff' || u.uid === user.uid));
+        }
       };
       loadUsers();
     } else {
@@ -92,11 +103,11 @@ export const TaskForm: React.FC = () => {
         throw new Error('Please select an employee');
       }
 
-      // Calculate deadline: 48 hours from now (only for new tasks, not when editing)
+      // Calculate deadline: 72 hours from now (only for new tasks, not when editing)
       const now = new Date();
       const deadline = id 
         ? new Date(formData.deadline) // When editing, use the existing deadline
-        : new Date(now.getTime() + 48 * 60 * 60 * 1000); // 48 hours in milliseconds for new tasks
+        : new Date(now.getTime() + 72 * 60 * 60 * 1000); // 72 hours in milliseconds for new tasks
 
       const taskData: Omit<Task, 'id' | 'createdAt' | 'updatedAt'> = {
         clientName: formData.clientName,
@@ -104,9 +115,9 @@ export const TaskForm: React.FC = () => {
         description: formData.description,
         assignedEmployeeId: assignedEmployeeId,
         assignedEmployeeName: assignedUser.displayName,
-        deadline: deadline, // Automatically set to 48 hours from creation for new tasks
+        deadline: deadline, // Automatically set to 72 hours from creation for new tasks
         priority: formData.priority,
-        estimatedDuration: 48, // Fixed to 48 hours as per deadline
+        estimatedDuration: 72, // Fixed to 72 hours as per deadline
         netInvoiceAmount: parseFloat(formData.netInvoiceAmount),
         status: 'Pending',
         taskCategory: formData.taskCategory || undefined,
@@ -134,8 +145,8 @@ export const TaskForm: React.FC = () => {
             taskTitle: formData.title,
             taskType: formData.taskType || undefined,
             taskCategory: formData.taskCategory || undefined,
-            hours: 48, // Fixed 48 hours
-            rate: taskData.netInvoiceAmount / 48,
+            hours: 72, // Fixed 72 hours
+            rate: taskData.netInvoiceAmount / 72,
             amount: taskData.netInvoiceAmount,
           }],
           subtotal: taskData.netInvoiceAmount,
@@ -173,7 +184,11 @@ export const TaskForm: React.FC = () => {
   return (
     <div className="max-w-3xl mx-auto px-4 py-6">
       <h1 className="text-3xl font-bold text-gray-900 mb-6">
-        {id ? 'Edit Task' : user?.role === 'admin' ? 'Create New Task' : 'Create My Task'}
+        {id
+          ? 'Edit Task'
+          : user?.role === 'admin' || user?.role === 'manager'
+            ? 'Create New Task'
+            : 'Create My Task'}
       </h1>
 
       <form onSubmit={handleSubmit} className="bg-white shadow rounded-lg p-6 space-y-6">
@@ -225,7 +240,7 @@ export const TaskForm: React.FC = () => {
           />
         </div>
 
-        {user?.role === 'admin' ? (
+        {user?.role === 'admin' || user?.role === 'manager' ? (
           <div>
             <label htmlFor="assignedEmployeeId" className="block text-sm font-medium text-gray-700">
               Assigned Employee *
@@ -288,7 +303,7 @@ export const TaskForm: React.FC = () => {
         </div>
 
         <div>
-          <label htmlFor="taskType" className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="taskType" className="block text-sm font-medium text-gray-700 mb-2">
             Task Type *
           </label>
           <select
@@ -313,6 +328,9 @@ export const TaskForm: React.FC = () => {
               Available types: {taskTypeCategories[formData.taskCategory as keyof typeof taskTypeCategories]?.join(', ')}
             </p>
           )}
+          {formData.taskType && taskTypeHelp[formData.taskType] && (
+            <p className="mt-1 text-sm text-gray-500">{taskTypeHelp[formData.taskType]}</p>
+          )}
         </div>
 
         <div className="grid grid-cols-2 gap-4">
@@ -336,17 +354,17 @@ export const TaskForm: React.FC = () => {
           ) : (
             <div>
               <label htmlFor="deadline" className="block text-sm font-medium text-gray-700">
-                Deadline (Auto-set to 48 hours)
+                Deadline (Auto-set to 72 hours)
               </label>
               <input
                 type="text"
                 id="deadline"
                 disabled
                 className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 bg-gray-100 text-gray-600 cursor-not-allowed"
-                value={format(new Date(Date.now() + 48 * 60 * 60 * 1000), 'yyyy-MM-dd HH:mm')}
+                value={format(new Date(Date.now() + 72 * 60 * 60 * 1000), 'yyyy-MM-dd HH:mm')}
               />
               <p className="mt-1 text-sm text-gray-500">
-                Task deadline is automatically set to 48 hours from creation time
+                Task deadline is automatically set to 72 hours from creation time
               </p>
             </div>
           )}
@@ -362,6 +380,7 @@ export const TaskForm: React.FC = () => {
               value={formData.priority}
               onChange={(e) => setFormData({ ...formData, priority: e.target.value as TaskPriority })}
             >
+              <option value="Urgent">Urgent</option>
               <option value="Low">Low</option>
               <option value="Medium">Medium</option>
               <option value="High">High</option>
@@ -384,7 +403,7 @@ export const TaskForm: React.FC = () => {
             onChange={(e) => setFormData({ ...formData, netInvoiceAmount: e.target.value })}
           />
           <p className="mt-1 text-sm text-gray-500">
-            Task duration is automatically set to 48 hours
+            Task duration is automatically set to 72 hours
           </p>
         </div>
 
@@ -408,4 +427,3 @@ export const TaskForm: React.FC = () => {
     </div>
   );
 };
-

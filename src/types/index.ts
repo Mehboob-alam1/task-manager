@@ -8,7 +8,7 @@ export interface User {
   createdAt: Date;
 }
 
-export type TaskPriority = 'Low' | 'Medium' | 'High';
+export type TaskPriority = 'Low' | 'Medium' | 'High' | 'Urgent';
 export type TaskStatus = 'Pending' | 'In Progress' | 'On Hold' | 'Completed';
 
 export const taskTypeCategories = {
@@ -17,7 +17,9 @@ export const taskTypeCategories = {
     'Corporate Tax Preparation',
     'Tax Problem Resolution/Offer & Compromise',
     'Penalty Abatement',
-    'Federal/State Representation'
+    'Federal/State Representation',
+    '1099 Creation',
+    'E-file'
   ],
   'Accounting Services': [
     'Marked Financial Statements',
@@ -25,13 +27,21 @@ export const taskTypeCategories = {
     'Payroll',
     'Sales Tax',
     'Initial QB Setup: Chart of Accounts & GL',
-    'Audit Services'
+    'Audit Services',
+    'P&L',
+    'Invoice',
+    'Compliance Check'
   ],
   'Consulting Services': [
     'Business Consulting',
     'Financial Planning',
-    'Tax Strategy'
-  ]
+    'Tax Strategy',
+    'Consulting Call',
+    'New Business Setup'
+  ],
+  'Other': [
+    'Other'
+  ],
 } as const;
 
 export interface Task {
@@ -88,7 +98,7 @@ export interface Invoice {
   clientName: string;
   invoiceDate: Date;
   dueDate: Date;
-  period: 'daily' | 'weekly';
+  period: 'daily' | 'weekly' | 'monthly';
   periodStart: Date;
   periodEnd: Date;
   tasks: {
@@ -109,4 +119,70 @@ export interface Invoice {
   createdAt: Date;
   createdBy: string; // Admin UID
   taskId?: string; // Link to the task that created this invoice
+}
+
+// Permissions System
+export type Permission =
+  | 'tasks.create'
+  | 'tasks.edit'
+  | 'tasks.delete'
+  | 'tasks.view_all'
+  | 'invoices.create'
+  | 'invoices.edit'
+  | 'invoices.delete'
+  | 'invoices.view_all'
+  | 'users.manage'
+  | 'users.view_all'
+  | 'reports.view'
+  | 'reports.generate'
+  | 'applications.manage'
+  | 'applications.view'
+  | 'settings.manage';
+
+export interface UserPermissions {
+  userId: string;
+  permissions: Permission[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// Third Party Applications
+export type ApplicationType = 'oauth' | 'api_key' | 'webhook' | 'integration';
+
+export type ApplicationStatus = 'active' | 'inactive' | 'suspended' | 'pending';
+
+export interface ThirdPartyApplication {
+  id: string;
+  name: string;
+  description?: string;
+  type: ApplicationType;
+  status: ApplicationStatus;
+  clientId?: string; // For OAuth
+  clientSecret?: string; // For OAuth (encrypted)
+  apiKey?: string; // For API key auth (encrypted)
+  apiKeyHash?: string; // Hashed version for verification
+  redirectUris?: string[]; // For OAuth
+  scopes?: string[]; // Permissions requested by the app
+  permissions: Permission[]; // What this app can do
+  createdBy: string; // User UID who created it
+  createdAt: Date;
+  updatedAt: Date;
+  lastUsedAt?: Date;
+  rateLimit?: {
+    requests: number;
+    period: 'minute' | 'hour' | 'day';
+  };
+}
+
+// User Signup Approval
+export interface SignupRequest {
+  id: string;
+  email: string;
+  displayName: string;
+  requestedRole: UserRole;
+  status: 'pending' | 'approved' | 'rejected';
+  requestedAt: Date;
+  reviewedBy?: string; // Admin UID
+  reviewedAt?: Date;
+  rejectionReason?: string;
 }

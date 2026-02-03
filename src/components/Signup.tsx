@@ -1,33 +1,51 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
-import { UserPlus, Mail, Lock, User } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { createSignupRequest } from '../firebase/firestore';
+import { UserPlus, Mail, Lock, User, CheckCircle } from 'lucide-react';
 import taskLogo from '../assets/task_logo.png';
 
 export const Signup: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
-  const [role, setRole] = useState<'admin' | 'manager' | 'staff'>('staff');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { register } = useAuth();
-  const navigate = useNavigate();
+  const [success, setSuccess] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
+    
+    // Validation
     if (password.length < 6) {
       setError('Password must be at least 6 characters');
       setLoading(false);
       return;
     }
+    
+    // Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setError('Please enter a valid email address');
+      setLoading(false);
+      return;
+    }
+    
     try {
-      await register(email, password, displayName, role);
-      navigate('/dashboard');
+      // Create signup request instead of directly registering
+      await createSignupRequest({
+        email,
+        displayName,
+        requestedRole: 'staff', // Only staff can sign up, admin must approve
+      });
+      setSuccess(true);
+      // Clear form
+      setEmail('');
+      setPassword('');
+      setDisplayName('');
     } catch (err: any) {
-      setError(err.message || 'Failed to create account');
+      setError(err.message || 'Failed to submit signup request');
     } finally {
       setLoading(false);
     }
@@ -51,13 +69,39 @@ export const Signup: React.FC = () => {
 
         {/* Signup Card */}
         <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
-          {error && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-              <p className="text-sm text-red-800">{error}</p>
+          {success ? (
+            <div className="text-center py-8">
+              <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">Request Submitted!</h2>
+              <p className="text-gray-600 mb-4">
+                Your signup request has been submitted and is pending admin approval.
+              </p>
+              <p className="text-sm text-gray-500 mb-6">
+                You will receive an email notification once your account has been approved.
+              </p>
+              <Link
+                to="/login"
+                className="inline-flex items-center px-4 py-2 border border-transparent rounded-lg shadow-sm text-white bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800"
+              >
+                Go to Login
+              </Link>
             </div>
-          )}
+          ) : (
+            <>
+              {error && (
+                <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+                  <p className="text-sm text-red-800">{error}</p>
+                </div>
+              )}
 
-          <form onSubmit={handleSubmit} className="space-y-5">
+              <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm text-blue-800">
+                  <strong>Note:</strong> Your account request will be reviewed by an administrator. 
+                  You will be notified via email once your account is approved.
+                </p>
+              </div>
+
+              <form onSubmit={handleSubmit} className="space-y-5">
             <div>
               <label htmlFor="displayName" className="block text-sm font-medium text-gray-700 mb-2">
                 Full Name
@@ -119,21 +163,6 @@ export const Signup: React.FC = () => {
               </div>
             </div>
 
-            <div>
-              <label htmlFor="role" className="block text-sm font-medium text-gray-700 mb-2">
-                Role
-              </label>
-              <select
-                id="role"
-                className="block w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                value={role}
-                onChange={(e) => setRole(e.target.value as 'admin' | 'manager' | 'staff')}
-              >
-                <option value="staff">Staff</option>
-                <option value="manager">Manager</option>
-                <option value="admin">Admin</option>
-              </select>
-            </div>
 
             <button
               type="submit"
@@ -165,6 +194,8 @@ export const Signup: React.FC = () => {
               </Link>
             </p>
           </div>
+            </>
+          )}
         </div>
 
         {/* Footer */}

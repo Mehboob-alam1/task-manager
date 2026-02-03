@@ -32,6 +32,8 @@ export const CalendarView: React.FC = () => {
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
+      case 'Urgent':
+        return 'bg-red-700';
       case 'High':
         return 'bg-red-500';
       case 'Medium':
@@ -313,4 +315,3 @@ export const CalendarView: React.FC = () => {
     </div>
   );
 };
-

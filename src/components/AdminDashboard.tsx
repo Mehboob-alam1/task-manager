@@ -86,6 +86,8 @@ export const AdminDashboard: React.FC = () => {
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
+      case 'Urgent':
+        return 'bg-red-200 text-red-900';
       case 'High':
         return 'bg-red-100 text-red-800';
       case 'Medium':
@@ -219,7 +221,14 @@ export const AdminDashboard: React.FC = () => {
               <div className="ml-5 w-0 flex-1">
                 <dl>
                   <dt className="text-sm font-medium text-gray-500 truncate">
-                    Overdue
+                    <span className="inline-flex items-center">
+                      Overdue
+                      {overdueTasks.length > 0 && (
+                        <span className="ml-2 inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-800">
+                          Alert
+                        </span>
+                      )}
+                    </span>
                   </dt>
                   <dd className="text-lg font-medium text-gray-900">
                     {overdueTasks.length}
@@ -233,10 +242,10 @@ export const AdminDashboard: React.FC = () => {
 
       {/* All Tasks List */}
       <div className="bg-white shadow overflow-hidden sm:rounded-md mb-8">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <div className="flex justify-between items-center">
+        <div className="px-4 sm:px-6 py-4 border-b border-gray-200">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <h2 className="text-lg font-semibold text-gray-900">All Tasks</h2>
-            <div className="flex space-x-3">
+            <div className="flex flex-wrap gap-3">
               {/* Status Filter Dropdown */}
               <select
                 value={filterStatus}
@@ -290,10 +299,10 @@ export const AdminDashboard: React.FC = () => {
             filteredTasks.map((task) => (
               <li
                 key={task.id}
-                className="px-6 py-4 hover:bg-gray-50 cursor-pointer"
+                className="px-4 sm:px-6 py-4 hover:bg-gray-50 cursor-pointer"
                 onClick={() => navigate(`/tasks/${task.id}`)}
               >
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center space-x-3">
                       <div className="flex-1">
@@ -305,7 +314,7 @@ export const AdminDashboard: React.FC = () => {
                         </p>
                       </div>
                     </div>
-                    <div className="mt-2 flex items-center space-x-4 text-sm text-gray-500">
+                    <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-gray-500">
                       <span>Deadline: {format(new Date(task.deadline), 'MMM dd, yyyy HH:mm')}</span>
                       <span className={`px-2 py-1 rounded-full text-xs font-medium ${getPriorityColor(task.priority)}`}>
                         {task.priority}
@@ -330,7 +339,7 @@ export const AdminDashboard: React.FC = () => {
                     </div>
                   </div>
                   {new Date(task.deadline) < now && task.status !== 'Completed' && (
-                    <span className="ml-4 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                    <span className="md:ml-4 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
                       Overdue
                     </span>
                   )}
@@ -364,4 +373,3 @@ export const AdminDashboard: React.FC = () => {
     </div>
   );
 };
-

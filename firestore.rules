@@ -127,23 +127,42 @@ service cloud.firestore {
       allow update, delete: if false;
     }
     
-    // Invoices collection
-    match /invoices/{invoiceId} {
-      // Admins can read all invoices, staff can only read their own
+    // User Permissions collection
+    match /userPermissions/{permissionId} {
+      // Only admins can read all permissions
+      // Users can read their own permissions
       allow read: if isAuthenticated() && (
         isAdmin() || 
-        resource.data.createdBy == request.auth.uid
+        resource.data.userId == request.auth.uid
       );
       
-      // Staff can create invoices for their assigned tasks, admins can create any
-      allow create: if isAuthenticated() && 
-        request.resource.data.createdBy == request.auth.uid;
+      // Only admins can create/update/delete permissions
+      allow create, update, delete: if isAdmin();
+    }
+    
+    // Third Party Applications collection
+    match /thirdPartyApplications/{appId} {
+      // Only admins can read applications
+      allow read: if isAdmin();
       
-      // Only admins can update invoices
-      allow update: if isAdmin();
+      // Only admins can create/update/delete applications
+      allow create, update, delete: if isAdmin();
+    }
+    
+    // Signup Requests collection
+    match /signupRequests/{requestId} {
+      // Anyone can create a signup request (for public signup)
+      allow create: if true;
       
-      // Only admins can delete invoices
-      allow delete: if isAdmin();
+      // Only admins can read all requests
+      // Users can read their own request (by email matching)
+      allow read: if isAuthenticated() && (
+        isAdmin() || 
+        resource.data.email == request.auth.token.email
+      );
+      
+      // Only admins can update/delete requests
+      allow update, delete: if isAdmin();
     }
   }
 }

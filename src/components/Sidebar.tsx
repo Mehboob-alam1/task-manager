@@ -11,6 +11,9 @@ import {
   Bell,
   LogOut,
   X,
+  Key,
+  Shield,
+  UserCheck,
 } from 'lucide-react';
 import taskLogo from '../assets/task_logo.png';
 
@@ -42,7 +45,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle }) => {
       path: '/tasks/create',
       icon: PlusCircle,
       label: 'Create Task',
-      show: user?.role === 'admin',
+      show: user?.role === 'admin' || user?.role === 'manager',
     },
     {
       path: '/reports',
@@ -54,6 +57,24 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle }) => {
       path: '/users',
       icon: Users,
       label: 'Users',
+      show: user?.role === 'admin',
+    },
+    {
+      path: '/signup-approval',
+      icon: UserCheck,
+      label: 'Signup Requests',
+      show: user?.role === 'admin',
+    },
+    {
+      path: '/permissions',
+      icon: Shield,
+      label: 'Permissions',
+      show: user?.role === 'admin',
+    },
+    {
+      path: '/applications',
+      icon: Key,
+      label: 'Third Party Apps',
       show: user?.role === 'admin',
     },
     {
@@ -175,4 +196,3 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle }) => {
     </>
   );
 };
-

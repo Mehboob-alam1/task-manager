@@ -87,6 +87,8 @@ export const ManagerDashboard: React.FC = () => {
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
+      case 'Urgent':
+        return 'bg-red-200 text-red-900';
       case 'High':
         return 'bg-red-100 text-red-800';
       case 'Medium':
@@ -206,7 +208,14 @@ export const ManagerDashboard: React.FC = () => {
               <div className="ml-5 w-0 flex-1">
                 <dl>
                   <dt className="text-sm font-medium text-gray-500 truncate">
-                    Overdue
+                    <span className="inline-flex items-center">
+                      Overdue
+                      {overdueTasks.length > 0 && (
+                        <span className="ml-2 inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-800">
+                          Alert
+                        </span>
+                      )}
+                    </span>
                   </dt>
                   <dd className="text-lg font-medium text-gray-900">
                     {overdueTasks.length}
@@ -391,4 +400,3 @@ export const ManagerDashboard: React.FC = () => {
     </div>
   );
 };
-
