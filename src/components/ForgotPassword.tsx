@@ -147,10 +147,9 @@ export const ForgotPassword: React.FC = () => {
 
         {/* Footer */}
         <p className="mt-8 text-center text-sm text-gray-500">
-          2024 Omega Tax - Version 1.0 - All right reserrved.
+          2024 Omega Tax - Version 1.0 - All rights reserved.
         </p>
       </div>
     </div>
   );
 };
-
