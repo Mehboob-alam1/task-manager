@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Task, Invoice } from '../types';
-import { subscribeToTasks, subscribeToInvoices } from '../firebase/firestore';
+import { subscribeToPipelineFilesCount, subscribeToTasks, subscribeToInvoices } from '../firebase/firestore';
 import { format } from 'date-fns';
-import { CheckCircle, Clock, AlertCircle, Calendar, DollarSign, PlusCircle } from 'lucide-react';
+import { CheckCircle, Clock, AlertCircle, Calendar, DollarSign, PlusCircle, Inbox } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export const StaffDashboard: React.FC = () => {
@@ -13,6 +13,7 @@ export const StaffDashboard: React.FC = () => {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [pipelineCount, setPipelineCount] = useState(0);
 
   useEffect(() => {
     if (!user) return;
@@ -35,10 +36,12 @@ export const StaffDashboard: React.FC = () => {
       },
       user.uid
     );
+    const unsubscribePipeline = subscribeToPipelineFilesCount(setPipelineCount);
 
     return () => {
       unsubscribeTasks();
       unsubscribeInvoices();
+      unsubscribePipeline();
     };
   }, [user]);
 
@@ -122,7 +125,7 @@ export const StaffDashboard: React.FC = () => {
       </div>
 
       {/* Stats Cards - My Tasks Overview */}
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 mb-8">
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-5 mb-8">
         <div className="bg-white overflow-hidden shadow rounded-lg">
           <div className="p-5">
             <div className="flex items-center">
@@ -207,6 +210,27 @@ export const StaffDashboard: React.FC = () => {
                 </dl>
               </div>
             </div>
+          </div>
+        </div>
+
+        <div className="bg-white overflow-hidden shadow rounded-lg">
+          <div className="p-5">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <Inbox className="h-6 w-6 text-purple-500" />
+              </div>
+              <div className="ml-5 w-0 flex-1">
+                <dl>
+                  <dt className="text-sm font-medium text-gray-500 truncate">
+                    Files in Pipeline
+                  </dt>
+                  <dd className="text-lg font-medium text-gray-900">
+                    {pipelineCount}
+                  </dd>
+                </dl>
+              </div>
+            </div>
+            <p className="mt-2 text-xs text-purple-600">Waiting assignment</p>
           </div>
         </div>
       </div>

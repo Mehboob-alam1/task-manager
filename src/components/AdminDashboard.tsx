@@ -2,9 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { Task, User } from '../types';
-import { subscribeToTasks, getUsers } from '../firebase/firestore';
+import { subscribeToPipelineFilesCount, subscribeToTasks, getUsers } from '../firebase/firestore';
 import { format } from 'date-fns';
-import { CheckCircle, Clock, AlertCircle, Users, PlusCircle, BarChart3 } from 'lucide-react';
+import { CheckCircle, Clock, AlertCircle, Users, PlusCircle, BarChart3, Inbox } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export const AdminDashboard: React.FC = () => {
@@ -16,6 +16,7 @@ export const AdminDashboard: React.FC = () => {
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterClient, setFilterClient] = useState<string>('all');
   const [filterEmployee, setFilterEmployee] = useState<string>('all');
+  const [pipelineCount, setPipelineCount] = useState(0);
 
   useEffect(() => {
     if (!user || user.role !== 'admin') {
@@ -34,12 +35,16 @@ export const AdminDashboard: React.FC = () => {
 
     loadUsers();
 
-    const unsubscribe = subscribeToTasks((tasks) => {
+    const unsubscribeTasks = subscribeToTasks((tasks) => {
       setTasks(tasks);
       setLoading(false);
     });
+    const unsubscribePipeline = subscribeToPipelineFilesCount(setPipelineCount);
 
-    return unsubscribe;
+    return () => {
+      unsubscribeTasks();
+      unsubscribePipeline();
+    };
   }, [user, navigate]);
 
   if (loading) {
@@ -151,7 +156,7 @@ export const AdminDashboard: React.FC = () => {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 mb-8">
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-5 mb-8">
         <div className="bg-white overflow-hidden shadow rounded-lg">
           <div className="p-5">
             <div className="flex items-center">
@@ -236,6 +241,27 @@ export const AdminDashboard: React.FC = () => {
                 </dl>
               </div>
             </div>
+          </div>
+        </div>
+
+        <div className="bg-white overflow-hidden shadow rounded-lg">
+          <div className="p-5">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <Inbox className="h-6 w-6 text-purple-500" />
+              </div>
+              <div className="ml-5 w-0 flex-1">
+                <dl>
+                  <dt className="text-sm font-medium text-gray-500 truncate">
+                    Files in Pipeline
+                  </dt>
+                  <dd className="text-lg font-medium text-gray-900">
+                    {pipelineCount}
+                  </dd>
+                </dl>
+              </div>
+            </div>
+            <p className="mt-2 text-xs text-purple-600">Waiting assignment</p>
           </div>
         </div>
       </div>

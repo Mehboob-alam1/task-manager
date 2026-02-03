@@ -239,6 +239,29 @@ export const subscribeToTasks = (
 // Notifications collection
 export const notificationsCollection = collection(db, 'notifications');
 
+// Pipeline files collection
+export const pipelineFilesCollection = collection(db, 'pipelineFiles');
+
+export const subscribeToPipelineFilesCount = (
+  callback: (count: number) => void
+): (() => void) => {
+  if (!pipelineFilesCollection) {
+    callback(0);
+    return () => {};
+  }
+
+  return onSnapshot(
+    pipelineFilesCollection,
+    (snapshot) => {
+      callback(snapshot.size);
+    },
+    (error) => {
+      console.error('Error subscribing to pipeline files:', error);
+      callback(0);
+    }
+  );
+};
+
 export const getNotifications = async (userId: string): Promise<Notification[]> => {
   const q = query(
     notificationsCollection,

@@ -17,6 +17,7 @@ Roles define what each user can see and do.
 - `Admin Dashboard`: Full task view, staff filters, and overdue tracking.
 - `Manager Dashboard`: Team task view and assignment support.
 - `Staff Dashboard`: Your assigned tasks only.
+- `Files in Pipeline`: Shows the number of incoming files waiting to be assigned.
 
 ## Creating and Assigning Tasks
 1. Go to `Create Task`.
