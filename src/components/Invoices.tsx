@@ -238,8 +238,8 @@ export const Invoices: React.FC = () => {
 
   const downloadInvoicePDF = async (invoice: Invoice) => {
     const doc = new jsPDF();
-    // Start content a bit lower to leave space for logo and header
-    let yPos = 50;
+    // Start content lower to leave space for logo and header
+    let yPos = 70;
 
     // Load and add logo
     try {
@@ -251,9 +251,9 @@ export const Invoices: React.FC = () => {
         logoImg.src = '/task_logo.png';
       });
       
-      // Add logo (bigger size: 50x50) at top-left corner
-      const logoWidth = 50;
-      const logoHeight = 50;
+      // Add logo at top-left corner
+      const logoWidth = 40;
+      const logoHeight = 40;
       doc.addImage(logoImg, 'PNG', 15, 10, logoWidth, logoHeight);
     } catch (error) {
       console.error('Error loading logo:', error);
@@ -409,8 +409,8 @@ export const Invoices: React.FC = () => {
       const weekStart = new Date(weekKey);
       const weekEnd = endOfWeek(weekStart, { weekStartsOn: 0 });
       
-      // Start content a bit lower to leave space for logo and header
-      let yPos = 50;
+      // Start content lower to leave space for logo and header
+      let yPos = 70;
       let isFirstPage = true;
 
       // Add logo on first page of each week (top-left corner)
@@ -434,7 +434,7 @@ export const Invoices: React.FC = () => {
         // Check if we need a new page (leave space for at least one invoice)
         if (yPos > 200 && !isFirstPage) {
           doc.addPage();
-          yPos = 50;
+          yPos = 70;
           // Re-add logo on new page
           if (logoImg) {
             const logoWidth = 40;
@@ -601,7 +601,7 @@ export const Invoices: React.FC = () => {
     monthGroups.forEach((monthInvoices, monthKey) => {
       const monthStart = new Date(`${monthKey}-01T00:00:00`);
 
-      let yPos = 50;
+      let yPos = 70;
       let isFirstPage = true;
 
       if (logoImg && isFirstPage) {
@@ -622,7 +622,7 @@ export const Invoices: React.FC = () => {
       monthInvoices.forEach((invoice, index) => {
         if (yPos > 200 && !isFirstPage) {
           doc.addPage();
-          yPos = 50;
+          yPos = 70;
           if (logoImg) {
             const logoWidth = 40;
             const logoHeight = 40;
